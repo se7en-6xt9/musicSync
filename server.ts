@@ -53,6 +53,7 @@ async function startServer() {
         if (existingMember) {
           existingMember.isOnline = true;
           existingMember.socketId = socket.id;
+          existingMember.name = user.name;
         } else {
           room.members.push({ ...user, socketId: socket.id, isOnline: true, isAdmin: false });
         }
@@ -66,6 +67,7 @@ async function startServer() {
     socket.on("leave_room", ({ code, userId }) => {
       const room = rooms.get(code);
       if (room) {
+        socket.leave(code);
         room.members = room.members.filter((m: any) => m.id !== userId);
         if (room.members.length === 0) {
           rooms.delete(code);
@@ -76,7 +78,6 @@ async function startServer() {
           }
           io.to(code).emit("room_state_update", room);
         }
-        socket.leave(code);
       }
     });
 

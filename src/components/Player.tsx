@@ -9,12 +9,13 @@ interface PlayerProps {
   currentSong: Song | null;
   queue: Song[];
   isPlaying: boolean;
-  onPlayPause: (play: boolean) => void;
+  onPlayPause: (play: boolean, time?: number) => void;
   onNext: () => void;
   onPrevious: () => void;
   onPlaySong: (song: Song) => void;
   syncTime?: number | null;
   onSeek?: (time: number) => void;
+  onTimeUpdate?: (time: number) => void;
   onSendReaction?: (reaction: string) => void;
 }
 
@@ -28,6 +29,7 @@ export const Player: React.FC<PlayerProps> = ({
   onPlaySong,
   syncTime,
   onSeek,
+  onTimeUpdate,
   onSendReaction
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -96,8 +98,8 @@ export const Player: React.FC<PlayerProps> = ({
         }))
       });
 
-      navigator.mediaSession.setActionHandler('play', () => onPlayPause(true));
-      navigator.mediaSession.setActionHandler('pause', () => onPlayPause(false));
+      navigator.mediaSession.setActionHandler('play', () => onPlayPause(true, audioRef.current?.currentTime));
+      navigator.mediaSession.setActionHandler('pause', () => onPlayPause(false, audioRef.current?.currentTime));
       navigator.mediaSession.setActionHandler('previoustrack', onPrevious);
       navigator.mediaSession.setActionHandler('nexttrack', onNext);
     }
@@ -105,8 +107,12 @@ export const Player: React.FC<PlayerProps> = ({
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
-      setProgress(audioRef.current.currentTime);
+      const time = audioRef.current.currentTime;
+      setProgress(time);
       setDuration(audioRef.current.duration || 0);
+      if (onTimeUpdate) {
+        onTimeUpdate(time);
+      }
     }
   };
 
@@ -161,7 +167,7 @@ export const Player: React.FC<PlayerProps> = ({
     <>
       <audio
         ref={audioRef}
-        src={audioUrl}
+        src={audioUrl || undefined}
         onTimeUpdate={handleTimeUpdate}
         onEnded={isLooping ? undefined : onNext}
         loop={isLooping}
@@ -192,7 +198,7 @@ export const Player: React.FC<PlayerProps> = ({
                 className="w-full aspect-square rounded-3xl overflow-hidden shadow-2xl mb-8"
                 layoutId={`artwork-${currentSong.id}`}
               >
-                <img src={imageUrl} alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src={imageUrl || undefined} alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               </motion.div>
 
               {/* Song Info */}
@@ -226,7 +232,7 @@ export const Player: React.FC<PlayerProps> = ({
                   <SkipBack size={32} className="fill-current" />
                 </button>
                 <button 
-                  onClick={() => onPlayPause(!isPlaying)}
+                  onClick={() => onPlayPause(!isPlaying, audioRef.current?.currentTime)}
                   className="w-20 h-20 flex items-center justify-center bg-emerald-500 text-black rounded-full hover:scale-105 transition-transform shadow-xl shadow-emerald-500/20"
                 >
                   {isPlaying ? <Pause size={36} className="fill-current" /> : <Play size={36} className="fill-current ml-2" />}
@@ -286,7 +292,7 @@ export const Player: React.FC<PlayerProps> = ({
                         }}
                         className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
                       >
-                        <img src={getHighestQualityImage(song.image)} alt="" className="w-12 h-12 rounded-md object-cover" referrerPolicy="no-referrer" />
+                        <img src={getHighestQualityImage(song.image) || undefined} alt="" className="w-12 h-12 rounded-md object-cover" referrerPolicy="no-referrer" />
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-sm font-medium text-white truncate" dangerouslySetInnerHTML={{ __html: song.name }} />
                           <span className="text-xs text-gray-400 truncate" dangerouslySetInnerHTML={{ __html: song.primaryArtists || 'Unknown Artist' }} />
@@ -322,7 +328,7 @@ export const Player: React.FC<PlayerProps> = ({
           <div className="flex items-center gap-3 w-1/2 sm:w-1/3 min-w-0">
             <motion.img 
               layoutId={`artwork-${currentSong.id}`}
-              src={imageUrl} 
+              src={imageUrl || undefined} 
               alt="Cover" 
               className="w-12 h-12 rounded-md object-cover shadow-md"
               referrerPolicy="no-referrer"
@@ -339,7 +345,7 @@ export const Player: React.FC<PlayerProps> = ({
               <SkipBack size={20} className="fill-current" />
             </button>
             <button 
-              onClick={() => onPlayPause(!isPlaying)}
+              onClick={() => onPlayPause(!isPlaying, audioRef.current?.currentTime)}
               className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full hover:scale-105 transition-transform"
             >
               {isPlaying ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-1" />}

@@ -66,4 +66,11 @@ export interface Room {
   code: string;
   members: RoomMember[];
   messages?: ChatMessage[];
+  playbackState?: {
+    currentSong: Song | null;
+    isPlaying: boolean;
+    queue: Song[];
+    currentTime: number;
+    updatedAt: number;
+  };
 }

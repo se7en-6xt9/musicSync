@@ -34,8 +34,8 @@ export const getTrendingSongs = async (): Promise<Song[]> => {
   }
 };
 
-export const getCategorySongs = async (query: string): Promise<Song[]> => {
-  return searchSongs(query);
+export const getCategorySongs = async (query: string, page: number = 1): Promise<Song[]> => {
+  return searchSongs(query, page);
 };
 
 export const getTopSongs = getTrendingSongs;
@@ -43,7 +43,14 @@ export const getTopSongs = getTrendingSongs;
 export const getSimilarSongs = async (song: Song): Promise<Song[]> => {
   try {
     // We can search by the primary artist to get similar songs
-    const artistName = song.primaryArtists ? song.primaryArtists.split(',')[0].trim() : '';
+    let artistName = '';
+    if (typeof song.primaryArtists === 'string') {
+      artistName = song.primaryArtists.split(',')[0].trim();
+    } else if (Array.isArray(song.primaryArtists) && song.primaryArtists.length > 0) {
+      const firstArtist = song.primaryArtists[0];
+      artistName = typeof firstArtist === 'string' ? firstArtist : (firstArtist.name || '');
+    }
+    
     if (!artistName) return [];
     
     const response = await fetch(`${BASE_URL}/search/songs?query=${encodeURIComponent(artistName)}`);
@@ -65,20 +72,20 @@ export const getHighestQualityAudio = (downloadUrls: { quality: string; link: st
   if (!downloadUrls || downloadUrls.length === 0) return '';
   
   // Handle both 'link' and 'url' properties depending on the API version
-  const getUrl = (item: any) => item.link || item.url;
+  const getUrl = (item: any) => item?.link || item?.url;
   
   // Try to find 320kbps, then 160kbps, then fallback to the last one (usually highest if sorted)
   const quality320 = downloadUrls.find(d => d.quality === '320kbps');
-  if (quality320) return getUrl(quality320);
+  if (quality320 && getUrl(quality320)) return getUrl(quality320);
   
   const quality160 = downloadUrls.find(d => d.quality === '160kbps');
-  if (quality160) return getUrl(quality160);
+  if (quality160 && getUrl(quality160)) return getUrl(quality160);
   
-  return getUrl(downloadUrls[downloadUrls.length - 1]);
+  return getUrl(downloadUrls[downloadUrls.length - 1]) || '';
 };
 
 export const getHighestQualityImage = (images: { quality: string; link: string }[] | { quality: string; url: string }[]): string => {
   if (!images || images.length === 0) return 'https://picsum.photos/500/500';
-  const getUrl = (item: any) => item.link || item.url;
-  return getUrl(images[images.length - 1]); // Usually the last one is 500x500
+  const getUrl = (item: any) => item?.link || item?.url;
+  return getUrl(images[images.length - 1]) || 'https://picsum.photos/500/500';
 };

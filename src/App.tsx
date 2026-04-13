@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Music, Loader2, Sparkles, Clock, Flame, HeartCrack, PartyPopper, Disc3, Mic2, ListMusic, X } from 'lucide-react';
+import { Search, Music, Loader2, Sparkles, Clock, Flame, HeartCrack, PartyPopper, Disc3, Mic2, ListMusic, X, ArrowLeft } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { Song, Room, RoomMember, ChatMessage } from './types';
 import { searchSongs, getTrendingSongs, getCategorySongs, getSimilarSongs } from './services/api';
 import { SongCard } from './components/SongCard';
+import { SongSection } from './components/SongSection';
 import { Player } from './components/Player';
 import { Navbar } from './components/Navbar';
 import { ChatBubble } from './components/ChatBubble';
@@ -31,6 +32,7 @@ export default function App() {
   const [queue, setQueue] = useState<Song[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [syncTime, setSyncTime] = useState<number | null>(null);
+  const currentTimeRef = useRef<number>(0);
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -39,32 +41,114 @@ export default function App() {
   const [searchPage, setSearchPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [homeCategoryIndex, setHomeCategoryIndex] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<{title: string, query: string} | null>(null);
   const extraCategories = ['Romantic', 'Workout', 'Chill', '90s Bollywood', 'Devotional', 'Pop', 'Indie', 'Punjabi', 'Lo-Fi'];
 
   // Room State
-  const [currentUserId] = useState(() => Math.random().toString(36).substring(2, 9));
+  const [currentUserId] = useState(() => {
+    let id = localStorage.getItem('music_sync_userId');
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 9);
+      localStorage.setItem('music_sync_userId', id);
+    }
+    return id;
+  });
   const [roomState, setRoomState] = useState<Room | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [roomInputName, setRoomInputName] = useState('');
   const [roomInputCode, setRoomInputCode] = useState('');
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState(() => localStorage.getItem('music_sync_userName') || '');
   const [reactions, setReactions] = useState<{id: number, reaction: string, userName: string}[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Refs for latest state in socket listeners
+  const userNameRef = useRef(userName);
+  useEffect(() => { userNameRef.current = userName; }, [userName]);
+  
+  const roomStateRef = useRef(roomState);
+  useEffect(() => { roomStateRef.current = roomState; }, [roomState]);
+  
+  const isExplicitExitRef = useRef(false);
+
+  // Handle page close/refresh
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (roomStateRef.current && !isExplicitExitRef.current) {
+        localStorage.setItem('music_sync_lastRoom', roomStateRef.current.code);
+        localStorage.setItem('music_sync_disconnectTime', Date.now().toString());
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   // Socket Connection
   useEffect(() => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL || undefined;
     socketRef.current = io(backendUrl);
 
+    socketRef.current.on("connect", () => {
+      const lastRoom = localStorage.getItem('music_sync_lastRoom');
+      const disconnectTime = localStorage.getItem('music_sync_disconnectTime');
+      
+      if (lastRoom && disconnectTime) {
+        const timeDiff = Date.now() - parseInt(disconnectTime);
+        if (timeDiff <= 60000) { // 1 minute
+          // Only reconnect if not already in a different room manually
+          if (!roomStateRef.current || roomStateRef.current.code === lastRoom) {
+            socketRef.current?.emit("join_room", {
+              code: lastRoom,
+              user: { id: currentUserId, name: userNameRef.current }
+            });
+          }
+        } else {
+          // Expired
+          localStorage.removeItem('music_sync_lastRoom');
+          localStorage.removeItem('music_sync_disconnectTime');
+        }
+      }
+    });
+
+    socketRef.current.on("disconnect", (reason) => {
+      if (roomStateRef.current && !isExplicitExitRef.current) {
+        localStorage.setItem('music_sync_lastRoom', roomStateRef.current.code);
+        localStorage.setItem('music_sync_disconnectTime', Date.now().toString());
+      }
+    });
+
     socketRef.current.on("room_state_update", (room: Room) => {
+      if (isExplicitExitRef.current) return;
+      
       setRoomState(room);
       if (room.messages) {
         setMessages(room.messages);
       }
+      
+      // Auto-sync playback state on join/reconnect
+      if (room.playbackState) {
+        if (room.playbackState.currentSong) {
+          setCurrentSong(room.playbackState.currentSong);
+        }
+        setIsPlaying(room.playbackState.isPlaying);
+        if (room.playbackState.queue && room.playbackState.queue.length > 0) {
+          setQueue(room.playbackState.queue);
+        }
+        
+        if (room.playbackState.isPlaying && room.playbackState.updatedAt) {
+           const timeDiff = (Date.now() - room.playbackState.updatedAt) / 1000;
+           const exactTime = room.playbackState.currentTime + timeDiff;
+           setSyncTime(exactTime);
+        } else if (room.playbackState.currentTime !== undefined) {
+           setSyncTime(room.playbackState.currentTime);
+        }
+      }
     });
 
     socketRef.current.on("kicked", () => {
+      isExplicitExitRef.current = true;
+      localStorage.removeItem('music_sync_lastRoom');
+      localStorage.removeItem('music_sync_disconnectTime');
       setRoomState(null);
       alert("You have been kicked from the room.");
     });
@@ -100,8 +184,10 @@ export default function App() {
     };
   }, []);
 
+
+
   // Sync playback changes to server
-  const emitPlaybackSync = (song: Song | null, playing: boolean, q: Song[], time: number = 0) => {
+  const emitPlaybackSync = (song: Song | null, playing: boolean, q: Song[], time?: number) => {
     if (roomState && socketRef.current) {
       socketRef.current.emit("sync_playback", {
         code: roomState.code,
@@ -109,7 +195,7 @@ export default function App() {
           currentSong: song,
           isPlaying: playing,
           queue: q,
-          currentTime: time
+          currentTime: time !== undefined ? time : currentTimeRef.current
         }
       });
     }
@@ -170,7 +256,7 @@ export default function App() {
     }
 
     return () => observer.disconnect();
-  }, [isLoading, isLoadingMore, activeTab, searchPage, homeCategoryIndex, searchResults]);
+  }, [isLoading, isLoadingMore, activeTab, searchPage, homeCategoryIndex, searchResults, activeCategory]);
 
   const loadMoreContent = async () => {
     setIsLoadingMore(true);
@@ -195,6 +281,19 @@ export default function App() {
                 return [...prev, ...newUnique];
              });
           }
+        }
+      } else if (activeTab === 'category' && activeCategory) {
+        const nextPage = searchPage + 1;
+        const fetchQuery = activeCategory.query === 'trending' ? 'top hits' : activeCategory.query;
+        const moreResults = await getCategorySongs(fetchQuery, nextPage);
+        
+        if (moreResults.length > 0) {
+          setSearchResults(prev => {
+            const existingIds = new Set(prev.map(s => s.id));
+            const newUnique = moreResults.filter(s => !existingIds.has(s.id));
+            return [...prev, ...newUnique];
+          });
+          setSearchPage(nextPage);
         }
       } else if (activeTab === 'home') {
         if (homeCategoryIndex < extraCategories.length) {
@@ -239,11 +338,34 @@ export default function App() {
     };
   }, [query]);
 
+  // Handle browser back button (hardware back button)
+  useEffect(() => {
+    window.history.replaceState({ page: 'home' }, '');
+    
+    const handlePopState = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state && state.page !== 'home') {
+        // If we popped to a state that is not home, we could handle it.
+        // But for simplicity, any back press goes to home.
+      }
+      setActiveTab('home');
+      setActiveCategory(null);
+      setQuery('');
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleSearchSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!query.trim()) return;
     
+    if (activeTab !== 'search') {
+      window.history.pushState({ page: 'search' }, '');
+    }
     setActiveTab('search');
+    setActiveCategory(null);
     setShowSuggestions(false);
     setIsLoading(true);
     setSearchPage(1);
@@ -256,10 +378,33 @@ export default function App() {
   const handleSuggestionClick = (song: Song) => {
     setQuery(song.name);
     setShowSuggestions(false);
+    if (activeTab !== 'search') {
+      window.history.pushState({ page: 'search' }, '');
+    }
     setActiveTab('search');
+    setActiveCategory(null);
     setSearchPage(1);
     handlePlay(song, searchSuggestions);
     handleSearchSubmit();
+  };
+
+  const handleSeeMore = (title: string, categoryQuery: string, initialSongs: Song[]) => {
+    window.history.pushState({ page: 'category' }, '');
+    setActiveTab('category');
+    setActiveCategory({ title, query: categoryQuery });
+    setSearchResults(initialSongs);
+    setSearchPage(1);
+    window.scrollTo(0, 0);
+  };
+
+  const handleUIBack = () => {
+    if (window.history.state && window.history.state.page !== 'home') {
+      window.history.back();
+    } else {
+      setActiveTab('home');
+      setActiveCategory(null);
+      setQuery('');
+    }
   };
 
   const addToRecentlyPlayed = (song: Song) => {
@@ -284,7 +429,7 @@ export default function App() {
       if (contextQueue.length > 0) {
         setQueue(newQueue);
       }
-      emitPlaybackSync(song, true, newQueue);
+      emitPlaybackSync(song, true, newQueue, 0);
     }
   };
 
@@ -296,7 +441,7 @@ export default function App() {
     setCurrentSong(nextSong);
     setIsPlaying(true);
     addToRecentlyPlayed(nextSong);
-    emitPlaybackSync(nextSong, true, queue);
+    emitPlaybackSync(nextSong, true, queue, 0);
   };
 
   const handlePrevious = () => {
@@ -307,12 +452,12 @@ export default function App() {
     setCurrentSong(prevSong);
     setIsPlaying(true);
     addToRecentlyPlayed(prevSong);
-    emitPlaybackSync(prevSong, true, queue);
+    emitPlaybackSync(prevSong, true, queue, 0);
   };
 
-  const handlePlayPause = (play: boolean) => {
+  const handlePlayPause = (play: boolean, time?: number) => {
     setIsPlaying(play);
-    emitPlaybackSync(currentSong, play, queue);
+    emitPlaybackSync(currentSong, play, queue, time);
   };
 
   const handleSeek = (time: number) => {
@@ -323,6 +468,11 @@ export default function App() {
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomInputName.trim() || !userName.trim()) return;
+    
+    localStorage.setItem('music_sync_userName', userName);
+    isExplicitExitRef.current = false;
+    localStorage.removeItem('music_sync_lastRoom');
+    localStorage.removeItem('music_sync_disconnectTime');
     
     if (socketRef.current) {
       socketRef.current.emit("create_room", {
@@ -340,6 +490,11 @@ export default function App() {
     e.preventDefault();
     if (!roomInputCode.trim() || !userName.trim()) return;
     
+    localStorage.setItem('music_sync_userName', userName);
+    isExplicitExitRef.current = false;
+    localStorage.removeItem('music_sync_lastRoom');
+    localStorage.removeItem('music_sync_disconnectTime');
+    
     if (socketRef.current) {
       socketRef.current.emit("join_room", {
         code: roomInputCode,
@@ -353,6 +508,10 @@ export default function App() {
 
   const handleExitRoom = () => {
     if (!roomState) return;
+    isExplicitExitRef.current = true;
+    localStorage.removeItem('music_sync_lastRoom');
+    localStorage.removeItem('music_sync_disconnectTime');
+    
     if (socketRef.current) {
       socketRef.current.emit("leave_room", { code: roomState.code, userId: currentUserId });
     }
@@ -401,36 +560,15 @@ export default function App() {
     }
   };
 
-  const renderSongSection = (title: string, icon: React.ReactNode, songs: Song[]) => {
-    if (songs.length === 0) return null;
-    return (
-      <section className="mb-12">
-        <div className="flex items-center gap-2 mb-6">
-          {icon}
-          <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-        </div>
-        <div className="flex overflow-x-auto pb-6 gap-4 sm:gap-6 snap-x hide-scrollbar">
-          {songs.map((song) => (
-            <div key={song.id} className="min-w-[140px] sm:min-w-[180px] max-w-[140px] sm:max-w-[180px] snap-start">
-              <SongCard 
-                song={song} 
-                isPlaying={isPlaying}
-                isCurrentSong={currentSong?.id === song.id}
-                onPlay={(s) => handlePlay(s, songs)}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-24 font-sans selection:bg-emerald-500/30 relative">
       
       <Navbar 
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          if (tab === 'home') setActiveCategory(null);
+        }}
         query={query}
         setQuery={setQuery}
         onSearchSubmit={handleSearchSubmit}
@@ -459,9 +597,18 @@ export default function App() {
         ) : activeTab === 'search' || searchResults.length > 0 ? (
           // Search Results View
           <section>
-            <div className="flex items-center gap-2 mb-8">
-              <Search className="w-6 h-6 text-emerald-500" />
-              <h2 className="text-3xl font-bold tracking-tight">Search Results</h2>
+            <div className="flex items-center gap-4 mb-8">
+              <button 
+                onClick={handleUIBack}
+                className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
+                title="Go Back"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <div className="flex items-center gap-2">
+                <Search className="w-6 h-6 text-emerald-500" />
+                <h2 className="text-3xl font-bold tracking-tight">Search Results</h2>
+              </div>
             </div>
             {searchResults.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
@@ -479,20 +626,48 @@ export default function App() {
               <p className="text-gray-400 text-center py-20">No results found. Try searching for something else.</p>
             )}
           </section>
+        ) : activeTab === 'category' && activeCategory ? (
+          // Category Full View
+          <section>
+            <div className="flex items-center gap-4 mb-8">
+              <button 
+                onClick={handleUIBack}
+                className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
+                title="Go Back"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <div className="flex items-center gap-2">
+                <ListMusic className="w-6 h-6 text-emerald-500" />
+                <h2 className="text-3xl font-bold tracking-tight">{activeCategory.title}</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
+              {searchResults.map((song) => (
+                <SongCard 
+                  key={song.id} 
+                  song={song} 
+                  isPlaying={isPlaying}
+                  isCurrentSong={currentSong?.id === song.id}
+                  onPlay={(s) => handlePlay(s, searchResults)}
+                />
+              ))}
+            </div>
+          </section>
         ) : (
           // Home View
           <div>
-            {renderSongSection("Recently Played", <Clock className="w-6 h-6 text-emerald-500" />, recentlyPlayed)}
-            {renderSongSection("Trending Now", <Flame className="w-6 h-6 text-orange-500" />, trendingSongs)}
-            {renderSongSection("Sad Songs", <HeartCrack className="w-6 h-6 text-blue-500" />, sadSongs)}
-            {renderSongSection("Party Anthems", <PartyPopper className="w-6 h-6 text-purple-500" />, partySongs)}
-            {renderSongSection("Remixes", <Disc3 className="w-6 h-6 text-pink-500" />, remixSongs)}
-            {renderSongSection("Top Artist: Arijit Singh", <Mic2 className="w-6 h-6 text-yellow-500" />, artistSongs)}
+            <SongSection title="Recently Played" icon={<Clock className="w-6 h-6 text-emerald-500" />} initialSongs={recentlyPlayed} query="recent" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+            <SongSection title="Trending Now" icon={<Flame className="w-6 h-6 text-orange-500" />} initialSongs={trendingSongs} query="trending" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+            <SongSection title="Sad Songs" icon={<HeartCrack className="w-6 h-6 text-blue-500" />} initialSongs={sadSongs} query="sad songs" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+            <SongSection title="Party Anthems" icon={<PartyPopper className="w-6 h-6 text-purple-500" />} initialSongs={partySongs} query="party songs" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+            <SongSection title="Remixes" icon={<Disc3 className="w-6 h-6 text-pink-500" />} initialSongs={remixSongs} query="remix" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+            <SongSection title="Top Artist: Arijit Singh" icon={<Mic2 className="w-6 h-6 text-yellow-500" />} initialSongs={artistSongs} query="Arijit Singh" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
             
             {/* Dynamically loaded sections */}
             {extraSections.map((section, idx) => (
               <React.Fragment key={idx}>
-                {renderSongSection(section.title, <ListMusic className="w-6 h-6 text-emerald-500" />, section.songs)}
+                <SongSection title={section.title} icon={<ListMusic className="w-6 h-6 text-emerald-500" />} initialSongs={section.songs} query={section.title} isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
               </React.Fragment>
             ))}
           </div>
@@ -517,6 +692,7 @@ export default function App() {
         onPlaySong={(s) => handlePlay(s, queue)}
         syncTime={syncTime}
         onSeek={handleSeek}
+        onTimeUpdate={(time) => { currentTimeRef.current = time; }}
         onSendReaction={roomState ? handleSendReaction : undefined}
       />
 
