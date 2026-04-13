@@ -143,6 +143,32 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Proxy routes for JioSaavn API to bypass CORS/Adblockers
+  app.get("/api/jiosaavn/search/songs", async (req, res) => {
+    try {
+      const { query, page } = req.query;
+      const response = await fetch(`https://jiosaavn-api-privatecvc2.vercel.app/search/songs?query=${encodeURIComponent(query as string)}&page=${page || 1}`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error proxying search:', error);
+      res.status(500).json({ error: 'Failed to fetch from JioSaavn API' });
+    }
+  });
+
+  app.get("/api/jiosaavn/modules", async (req, res) => {
+    try {
+      const response = await fetch(`https://jiosaavn-api-privatecvc2.vercel.app/modules`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Error proxying modules:', error);
+      res.status(500).json({ error: 'Failed to fetch from JioSaavn API' });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

@@ -1,6 +1,6 @@
 import { Song } from '../types';
 
-const BASE_URL = 'https://jiosaavn-api-privatecvc2.vercel.app';
+const BASE_URL = '/api/jiosaavn';
 
 export const searchSongs = async (query: string, page: number = 1): Promise<Song[]> => {
   try {

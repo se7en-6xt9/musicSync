@@ -1,7 +1,7 @@
 {
-  "name": "VibeMusic Player",
-  "short_name": "VibeMusic",
-  "description": "Ad-free modern music player",
+  "name": "Melody Sync",
+  "short_name": "Melody Sync",
+  "description": "Melody Sync - Listen & Vibe Together. Ad-free modern music player.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
