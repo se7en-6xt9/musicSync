@@ -1,5 +1,5 @@
 {
-  "name": "Melody Sync",
-  "description": "Melody Sync - Listen & Vibe Together. An ad-free music player to enjoy trending songs, create rooms, and sync music with friends in real-time.",
+  "name": "VibeMusic",
+  "description": "A modern, ad-free PWA music player using JioSaavn API.",
   "requestFramePermissions": []
 }
