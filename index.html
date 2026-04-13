@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#000000" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="https://picsum.photos/seed/vibemusic/192/192" />
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
     <title>VibeMusic - Ad-Free Player</title>
     <script>
       if ('serviceWorker' in navigator) {
@@ -16,6 +17,47 @@
     </script>
   </head>
   <body class="bg-black text-white antialiased selection:bg-emerald-500/30">
+    <style>
+      #splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #0a0a0a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+      .splash-logo {
+        width: 120px;
+        height: 120px;
+        border-radius: 24px;
+        animation: pulse 1.5s infinite ease-in-out;
+        box-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+      }
+      @keyframes pulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        70% { transform: scale(1.05); box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      }
+    </style>
+    <div id="splash-screen">
+      <img src="/icon.png" alt="App Logo" class="splash-logo" onerror="this.src='https://picsum.photos/seed/vibemusic/192/192'" />
+    </div>
+    <script>
+      setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(() => {
+            splash.style.display = 'none';
+          }, 500);
+        }
+      }, 3000);
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
