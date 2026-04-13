@@ -68,7 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleCopyLink = () => {
     if (roomState) {
-      navigator.clipboard.writeText(`Join my room on MusicSync! Code: ${roomState.code}`);
+      navigator.clipboard.writeText(`Join my room on Melody Sync! Code: ${roomState.code}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
