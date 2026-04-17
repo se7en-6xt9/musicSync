@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Music, Loader2, Sparkles, Clock, Flame, HeartCrack, PartyPopper, Disc3, Mic2, ListMusic, X, ArrowLeft } from 'lucide-react';
+import { Search, Music, Loader2, Sparkles, Clock, Flame, HeartCrack, PartyPopper, Disc3, Mic2, ListMusic, X, ArrowLeft, Gamepad2 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { Song, Room, RoomMember, ChatMessage } from './types';
 import { searchSongs, getTrendingSongs, getCategorySongs, getSimilarSongs } from './services/api';
@@ -728,8 +728,8 @@ export default function App() {
         onSuggestionClick={handleSuggestionClick}
         roomState={roomState}
         currentUserId={currentUserId}
-        onCreateRoomClick={() => { window.location.hash = 'create-room'; }}
-        onJoinRoomClick={() => { window.location.hash = 'join-room'; }}
+        onCreateRoomClick={() => { window.location.replace('#create-room'); }}
+        onJoinRoomClick={() => { window.location.replace('#join-room'); }}
         onExitRoomClick={handleExitRoom}
         onKickMember={handleKickMember}
         onMakeAdmin={handleMakeAdmin}
@@ -804,64 +804,21 @@ export default function App() {
             </div>
           </section>
         ) : activeTab === 'games' ? (
-          // Games View
-          <section className="pt-4">
-            <div className="flex items-center gap-2 mb-8">
-              <Gamepad2 className="w-8 h-8 text-purple-500" />
-              <h2 className="text-3xl font-bold tracking-tight">Arcade</h2>
+          // Games View (Coming Soon)
+          <section className="pt-12 sm:pt-20 flex flex-col items-center justify-center min-h-[50vh] text-center">
+            <div className="relative mb-8 group">
+               <div className="absolute inset-0 bg-purple-500/30 blur-3xl rounded-full group-hover:bg-purple-500/50 transition-colors duration-500"></div>
+               <Gamepad2 className="w-24 h-24 text-purple-400 relative z-10 animate-bounce group-hover:scale-110 transition-transform duration-300" />
             </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Dummy Games */}
-              <div className="group relative bg-[#121212] border border-white/10 rounded-3xl overflow-hidden hover:border-purple-500/50 transition-all cursor-pointer">
-                <div className="aspect-video bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center p-8 relative overflow-hidden">
-                   <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/game1/800/600')] opacity-30 mix-blend-overlay bg-cover bg-center group-hover:scale-110 transition-transform duration-700"></div>
-                   <Gamepad2 className="w-20 h-20 text-purple-400 group-hover:scale-125 transition-transform duration-500 relative z-10" />
-                </div>
-                <div className="p-6">
-                   <h3 className="text-xl font-bold text-white mb-2">Guess The Song</h3>
-                   <p className="text-gray-400 text-sm">Listen to the beat and guess the track before your friends do in the room!</p>
-                   <div className="mt-4 flex gap-2">
-                       <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Multiplayer</span>
-                       <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Music</span>
-                   </div>
-                </div>
-              </div>
-
-              <div className="group relative bg-[#121212] border border-white/10 rounded-3xl overflow-hidden hover:border-emerald-500/50 transition-all cursor-pointer">
-                <div className="aspect-video bg-gradient-to-br from-emerald-500/20 to-green-500/20 flex items-center justify-center p-8 relative overflow-hidden">
-                   <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/game2/800/600')] opacity-30 mix-blend-overlay bg-cover bg-center group-hover:scale-110 transition-transform duration-700"></div>
-                   <ListMusic className="w-20 h-20 text-emerald-400 group-hover:scale-125 transition-transform duration-500 relative z-10" />
-                </div>
-                <div className="p-6">
-                   <h3 className="text-xl font-bold text-white mb-2">Ludo Sync</h3>
-                   <p className="text-gray-400 text-sm">Play the classic board game while vibing to the same synchronized playlist.</p>
-                   <div className="mt-4 flex gap-2">
-                       <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Board Game</span>
-                       <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Co-op</span>
-                   </div>
-                </div>
-              </div>
-
-              <div className="group relative bg-[#121212] border border-white/10 rounded-3xl overflow-hidden hover:border-orange-500/50 transition-all cursor-pointer">
-                <div className="aspect-video bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center p-8 relative overflow-hidden">
-                   <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/game3/800/600')] opacity-30 mix-blend-overlay bg-cover bg-center group-hover:scale-110 transition-transform duration-700"></div>
-                   <Mic2 className="w-20 h-20 text-orange-400 group-hover:scale-125 transition-transform duration-500 relative z-10" />
-                </div>
-                <div className="p-6">
-                   <h3 className="text-xl font-bold text-white mb-2">Karaoke King</h3>
-                   <p className="text-gray-400 text-sm">Sing along with the real-time lyrics and earn score based on your timing.</p>
-                   <div className="mt-4 flex gap-2">
-                       <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Solo / Room</span>
-                       <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">New</span>
-                   </div>
-                </div>
-              </div>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">
+              Melody Arcade
+            </h2>
+            <div className="inline-block px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-md mb-6 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+               <span className="text-sm font-bold uppercase tracking-wider text-emerald-400">Coming Soon</span>
             </div>
-            
-            <div className="mt-12 text-center">
-              <p className="text-gray-500">More games coming soon. Stay tuned!</p>
-            </div>
+            <p className="text-gray-400 text-lg max-w-lg mx-auto">
+              Get ready to play synced multiplayer games like Guess The Song, Ludo, and Karaoke with your friends while vibing to the same music.
+            </p>
           </section>
         ) : (
           // Home View

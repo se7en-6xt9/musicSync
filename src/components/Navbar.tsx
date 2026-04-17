@@ -360,7 +360,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                      <button
                         onClick={() => {
                           setShowRoomMenu(false);
-                          if (window.location.hash === '#room-menu') window.history.back();
                           onJoinRoomClick();
                         }}
                         className="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all"
@@ -371,7 +370,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <button
                         onClick={() => {
                            setShowRoomMenu(false);
-                           if (window.location.hash === '#room-menu') window.history.back();
                            onCreateRoomClick();
                         }}
                         className="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
