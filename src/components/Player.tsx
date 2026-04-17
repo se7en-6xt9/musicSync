@@ -17,6 +17,7 @@ interface PlayerProps {
   onSeek?: (time: number) => void;
   onTimeUpdate?: (time: number) => void;
   onSendReaction?: (reaction: string) => void;
+  onLoadMoreUpNext?: () => void;
 }
 
 export const Player: React.FC<PlayerProps> = ({ 
@@ -30,7 +31,8 @@ export const Player: React.FC<PlayerProps> = ({
   syncTime,
   onSeek,
   onTimeUpdate,
-  onSendReaction
+  onSendReaction,
+  onLoadMoreUpNext
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [progress, setProgress] = useState(0);
@@ -40,7 +42,33 @@ export const Player: React.FC<PlayerProps> = ({
   const [isLooping, setIsLooping] = useState(false);
   
   const [isExpanded, setIsExpanded] = useState(false);
-  const [similarSongs, setSimilarSongs] = useState<Song[]>([]);
+  const upNextObserverRef = useRef<HTMLDivElement>(null);
+  const [isFetchingUpNext, setIsFetchingUpNext] = useState(false);
+
+  // Derive the upNext items from the queue
+  const currentIndex = currentSong ? queue.findIndex(s => s.id === currentSong.id) : -1;
+  const upNextSongs = currentIndex !== -1 ? queue.slice(currentIndex + 1) : [];
+
+  // Infinite scroll intersection observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isFetchingUpNext && onLoadMoreUpNext) {
+          setIsFetchingUpNext(true);
+          onLoadMoreUpNext();
+          // Reset the fetching state after a short delay so consecutive triggers don't happen immediately
+          setTimeout(() => setIsFetchingUpNext(false), 1000);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    if (upNextObserverRef.current) {
+      observer.observe(upNextObserverRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [isFetchingUpNext, onLoadMoreUpNext, queue.length]);
 
   // Handle Hash for Android Back Button (Minimize Full-screen player)
   useEffect(() => {
@@ -81,13 +109,6 @@ export const Player: React.FC<PlayerProps> = ({
       }, 10);
     }
   };
-
-  // Fetch similar songs when current song changes
-  useEffect(() => {
-    if (currentSong) {
-      getSimilarSongs(currentSong).then(setSimilarSongs);
-    }
-  }, [currentSong]);
 
   // Handle Play/Pause
   useEffect(() => {
@@ -315,31 +336,36 @@ export const Player: React.FC<PlayerProps> = ({
                 </div>
               )}
 
-              {/* Similar Songs Section */}
-              {similarSongs.length > 0 && (
+              {/* Up Next Section */}
+              {upNextSongs.length > 0 && (
                 <div className="mt-8">
                   <div className="flex items-center gap-2 mb-4">
                     <ListMusic className="text-emerald-500 w-5 h-5" />
-                    <h3 className="text-lg font-semibold">Similar Songs</h3>
+                    <h3 className="text-lg font-semibold">Up Next</h3>
                   </div>
                   <div className="flex flex-col gap-3">
-                    {similarSongs.slice(0, 5).map(song => (
+                    {upNextSongs.map((song, index) => (
                       <div 
-                        key={song.id} 
+                        key={`${song.id}-${index}`} 
                         onClick={() => {
                           onPlaySong(song);
                           collapsePlayer();
                         }}
-                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
+                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors group"
                       >
                         <img src={getHighestQualityImage(song.image) || undefined} alt="" className="w-12 h-12 rounded-md object-cover" referrerPolicy="no-referrer" />
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="text-sm font-medium text-white truncate" dangerouslySetInnerHTML={{ __html: song.name }} />
                           <span className="text-xs text-gray-400 truncate" dangerouslySetInnerHTML={{ __html: song.primaryArtists || 'Unknown Artist' }} />
                         </div>
-                        <Play className="w-4 h-4 text-gray-400" />
+                        <Play className="w-4 h-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     ))}
+                  </div>
+                  
+                  {/* Infinite Scroll trigger for Up Next */}
+                  <div ref={upNextObserverRef} className="h-20 flex items-center justify-center mt-4">
+                     {isFetchingUpNext && <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>}
                   </div>
                 </div>
               )}

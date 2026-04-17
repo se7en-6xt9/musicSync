@@ -483,9 +483,36 @@ export default function App() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!currentSong || queue.length === 0) return;
     const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+    
+    // Infinite Autoplay: If we reached the end of the queue
+    if (currentIndex === queue.length - 1 || currentIndex === -1) {
+      try {
+        const similar = await getSimilarSongs(currentSong);
+        if (similar.length > 0) {
+           const existingIds = new Set(queue.map(s => s.id));
+           const newSongs = similar.filter(s => !existingIds.has(s.id));
+           
+           if (newSongs.length > 0) {
+              const newQueue = [...queue, ...newSongs];
+              setQueue(newQueue);
+              
+              const nextSong = newSongs[0];
+              setCurrentSong(nextSong);
+              setIsPlaying(true);
+              addToRecentlyPlayed(nextSong);
+              emitPlaybackSync(nextSong, true, newQueue, 0);
+              return;
+           }
+        }
+      } catch (err) {
+        console.error("Failed to load infinite songs", err);
+      }
+    }
+
+    // Normal next
     const nextIndex = (currentIndex + 1) % queue.length;
     const nextSong = queue[nextIndex];
     setCurrentSong(nextSong);
@@ -503,6 +530,28 @@ export default function App() {
     setIsPlaying(true);
     addToRecentlyPlayed(prevSong);
     emitPlaybackSync(prevSong, true, queue, 0);
+  };
+
+  const handleLoadMoreUpNext = async () => {
+    if (queue.length === 0) return;
+    const lastSong = queue[queue.length - 1]; // fetch based on the very last song in queue
+    try {
+      const similar = await getSimilarSongs(lastSong);
+      if (similar.length > 0) {
+        setQueue(prevQueue => {
+          const existingIds = new Set(prevQueue.map(s => s.id));
+          const newSongs = similar.filter(s => !existingIds.has(s.id));
+          if (newSongs.length > 0) {
+            const newQueue = [...prevQueue, ...newSongs];
+            emitPlaybackSync(currentSong, isPlaying, newQueue, undefined);
+            return newQueue;
+          }
+          return prevQueue;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load more up next songs", err);
+    }
   };
 
   const handlePlayPause = (play: boolean, time?: number) => {
@@ -746,6 +795,7 @@ export default function App() {
         onSeek={handleSeek}
         onTimeUpdate={(time) => { currentTimeRef.current = time; }}
         onSendReaction={roomState ? handleSendReaction : undefined}
+        onLoadMoreUpNext={handleLoadMoreUpNext}
       />
 
       {/* Floating Reactions */}

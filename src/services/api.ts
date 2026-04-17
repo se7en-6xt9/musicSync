@@ -35,6 +35,7 @@ export const getTrendingSongs = async (): Promise<Song[]> => {
 };
 
 export const getCategorySongs = async (query: string, page: number = 1): Promise<Song[]> => {
+  // Fetch real-time data directly
   return searchSongs(query, page);
 };
 
