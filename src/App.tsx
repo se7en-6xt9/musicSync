@@ -340,17 +340,33 @@ export default function App() {
 
   // Handle browser back button (hardware back button)
   useEffect(() => {
-    window.history.replaceState({ page: 'home' }, '');
+    window.history.replaceState({ page: 'home', query: '' }, '');
     
     const handlePopState = (e: PopStateEvent) => {
+      // If we are currently showing the player hash, ignore overriding from App state
+      // (The player's own hashchange listener handles the UI)
+      if (window.location.hash === '#player') return;
+
       const state = e.state;
-      if (state && state.page !== 'home') {
-        // If we popped to a state that is not home, we could handle it.
-        // But for simplicity, any back press goes to home.
+      if (state) {
+        setActiveTab(state.page || 'home');
+        if (state.page === 'category' && state.category) {
+          setActiveCategory(state.category);
+        } else {
+          setActiveCategory(null);
+        }
+        
+        if (state.query !== undefined) {
+          setQuery(state.query);
+        } else if (state.page === 'home') {
+          setQuery('');
+        }
+      } else {
+        // Fallback
+        setActiveTab('home');
+        setActiveCategory(null);
+        setQuery('');
       }
-      setActiveTab('home');
-      setActiveCategory(null);
-      setQuery('');
     };
     
     window.addEventListener('popstate', handlePopState);
@@ -362,7 +378,9 @@ export default function App() {
     if (!query.trim()) return;
     
     if (activeTab !== 'search') {
-      window.history.pushState({ page: 'search' }, '');
+      window.history.pushState({ page: 'search', query }, '');
+    } else {
+      window.history.replaceState({ page: 'search', query }, '');
     }
     setActiveTab('search');
     setActiveCategory(null);
@@ -376,20 +394,30 @@ export default function App() {
   };
 
   const handleSuggestionClick = (song: Song) => {
-    setQuery(song.name);
+    const songName = song.name;
+    setQuery(songName);
     setShowSuggestions(false);
     if (activeTab !== 'search') {
-      window.history.pushState({ page: 'search' }, '');
+      window.history.pushState({ page: 'search', query: songName }, '');
+    } else {
+      window.history.replaceState({ page: 'search', query: songName }, '');
     }
     setActiveTab('search');
     setActiveCategory(null);
     setSearchPage(1);
     handlePlay(song, searchSuggestions);
-    handleSearchSubmit();
+    // Explicitly search the literal songName
+    (async () => {
+      setIsLoading(true);
+      const results = await searchSongs(songName, 1);
+      setSearchResults(results);
+      setQueue(results);
+      setIsLoading(false);
+    })();
   };
 
   const handleSeeMore = (title: string, categoryQuery: string, initialSongs: Song[]) => {
-    window.history.pushState({ page: 'category' }, '');
+    window.history.pushState({ page: 'category', category: { title, query: categoryQuery } }, '');
     setActiveTab('category');
     setActiveCategory({ title, query: categoryQuery });
     setSearchResults(initialSongs);

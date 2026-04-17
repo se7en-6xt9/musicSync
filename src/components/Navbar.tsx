@@ -83,6 +83,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Left: Home Button */}
         <button
           onClick={() => {
+            if (activeTab !== 'home') {
+              window.history.pushState({ page: 'home', query: '' }, '');
+            }
             setActiveTab('home');
             setQuery('');
           }}

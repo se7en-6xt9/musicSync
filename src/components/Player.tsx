@@ -42,6 +42,46 @@ export const Player: React.FC<PlayerProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [similarSongs, setSimilarSongs] = useState<Song[]>([]);
 
+  // Handle Hash for Android Back Button (Minimize Full-screen player)
+  useEffect(() => {
+    if (window.location.hash === '#player') {
+      setIsExpanded(true);
+    }
+
+    const handleHashChange = () => {
+      if (window.location.hash === '#player') {
+        setIsExpanded(true);
+      } else {
+        setIsExpanded(false);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const expandPlayer = () => {
+    if (!isExpanded) {
+      setIsExpanded(true); // immediate UI change
+      window.location.hash = 'player';
+    }
+  };
+
+  const collapsePlayer = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setIsExpanded(false); // immediate UI change
+    if (window.location.hash.includes('player')) {
+      // Use setTimeout so the UI thread updates React state before we trigger history navigation
+      setTimeout(() => {
+        if (window.location.hash.includes('player')) {
+           window.history.back();
+        }
+      }, 10);
+    }
+  };
+
   // Fetch similar songs when current song changes
   useEffect(() => {
     if (currentSong) {
@@ -185,7 +225,7 @@ export const Player: React.FC<PlayerProps> = ({
           >
             {/* Expanded Header */}
             <div className="sticky top-0 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent z-10">
-              <button onClick={() => setIsExpanded(false)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+              <button onClick={collapsePlayer} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
                 <ChevronDown size={24} />
               </button>
               <span className="text-sm font-medium tracking-widest uppercase text-gray-400">Now Playing</span>
@@ -288,7 +328,7 @@ export const Player: React.FC<PlayerProps> = ({
                         key={song.id} 
                         onClick={() => {
                           onPlaySong(song);
-                          setIsExpanded(false);
+                          collapsePlayer();
                         }}
                         className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
                       >
@@ -311,7 +351,7 @@ export const Player: React.FC<PlayerProps> = ({
       {/* Mini Player (Bottom Bar) */}
       <motion.div 
         className="fixed bottom-0 left-0 right-0 bg-[#121212]/90 backdrop-blur-xl border-t border-white/10 px-4 py-2 z-40 cursor-pointer"
-        onClick={() => !isExpanded && setIsExpanded(true)}
+        onClick={expandPlayer}
         layoutId="player-bar"
       >
         {/* Progress Bar (Top edge of mini player) */}
@@ -340,17 +380,21 @@ export const Player: React.FC<PlayerProps> = ({
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-end sm:justify-center gap-4 w-1/2 sm:w-1/3" onClick={e => e.stopPropagation()}>
-            <button onClick={onPrevious} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
+          <div 
+            className="flex items-center justify-end sm:justify-center gap-4 w-1/2 sm:w-1/3" 
+            onClick={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <button onClick={(e) => { e.stopPropagation(); onPrevious(); }} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
               <SkipBack size={20} className="fill-current" />
             </button>
             <button 
-              onClick={() => onPlayPause(!isPlaying, audioRef.current?.currentTime)}
+              onClick={(e) => { e.stopPropagation(); onPlayPause(!isPlaying, audioRef.current?.currentTime); }}
               className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full hover:scale-105 transition-transform"
             >
               {isPlaying ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-1" />}
             </button>
-            <button onClick={onNext} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
               <SkipForward size={20} className="fill-current" />
             </button>
           </div>
