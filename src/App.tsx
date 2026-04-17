@@ -338,49 +338,43 @@ export default function App() {
     };
   }, [query]);
 
-  // Handle browser back button (hardware back button)
+  // Handle browser back button via URL Hash mapping
   useEffect(() => {
-    window.history.replaceState({ page: 'home', query: '' }, '');
-    
-    const handlePopState = (e: PopStateEvent) => {
-      // If we are currently showing the player hash, ignore overriding from App state
-      // (The player's own hashchange listener handles the UI)
-      if (window.location.hash === '#player') return;
+    const handleHashChange = () => {
+      const h = window.location.hash;
+      
+      // Modals
+      setShowCreateModal(h === '#create-room');
+      setShowJoinModal(h === '#join-room');
 
-      const state = e.state;
-      if (state) {
-        setActiveTab(state.page || 'home');
-        if (state.page === 'category' && state.category) {
-          setActiveCategory(state.category);
-        } else {
-          setActiveCategory(null);
-        }
-        
-        if (state.query !== undefined) {
-          setQuery(state.query);
-        } else if (state.page === 'home') {
-          setQuery('');
-        }
-      } else {
-        // Fallback
+      // (Note: Player #player is handled directly in Player.tsx)
+      if (h === '#player') return;
+
+      // Base Tabs Navigation
+      if (h === '' || h === '#home') {
         setActiveTab('home');
         setActiveCategory(null);
         setQuery('');
+      } else if (h === '#search') {
+        setActiveTab('search');
+      } else if (h === '#category') {
+        setActiveTab('category');
       }
     };
-    
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+
+    window.addEventListener('hashchange', handleHashChange);
+    // Initialize state from current hash immediately
+    handleHashChange();
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const handleSearchSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!query.trim()) return;
     
-    if (activeTab !== 'search') {
-      window.history.pushState({ page: 'search', query }, '');
-    } else {
-      window.history.replaceState({ page: 'search', query }, '');
+    if (window.location.hash !== '#search') {
+      window.location.hash = 'search';
     }
     setActiveTab('search');
     setActiveCategory(null);
@@ -397,10 +391,8 @@ export default function App() {
     const songName = song.name;
     setQuery(songName);
     setShowSuggestions(false);
-    if (activeTab !== 'search') {
-      window.history.pushState({ page: 'search', query: songName }, '');
-    } else {
-      window.history.replaceState({ page: 'search', query: songName }, '');
+    if (window.location.hash !== '#search') {
+      window.location.hash = 'search';
     }
     setActiveTab('search');
     setActiveCategory(null);
@@ -417,7 +409,9 @@ export default function App() {
   };
 
   const handleSeeMore = (title: string, categoryQuery: string, initialSongs: Song[]) => {
-    window.history.pushState({ page: 'category', category: { title, query: categoryQuery } }, '');
+    if (window.location.hash !== '#category') {
+      window.location.hash = 'category';
+    }
     setActiveTab('category');
     setActiveCategory({ title, query: categoryQuery });
     setSearchResults(initialSongs);
@@ -426,13 +420,7 @@ export default function App() {
   };
 
   const handleUIBack = () => {
-    if (window.history.state && window.history.state.page !== 'home') {
-      window.history.back();
-    } else {
-      setActiveTab('home');
-      setActiveCategory(null);
-      setQuery('');
-    }
+    window.history.back(); // This hands off cleanly to browser back logic
   };
 
   const addToRecentlyPlayed = (song: Song) => {
@@ -510,7 +498,8 @@ export default function App() {
       });
     }
     
-    setShowCreateModal(false);
+    if (window.location.hash === '#create-room') window.history.back();
+    else setShowCreateModal(false);
     setRoomInputName('');
   };
 
@@ -530,7 +519,8 @@ export default function App() {
       });
     }
     
-    setShowJoinModal(false);
+    if (window.location.hash === '#join-room') window.history.back();
+    else setShowJoinModal(false);
     setRoomInputCode('');
   };
 
@@ -607,8 +597,8 @@ export default function App() {
         onSuggestionClick={handleSuggestionClick}
         roomState={roomState}
         currentUserId={currentUserId}
-        onCreateRoomClick={() => setShowCreateModal(true)}
-        onJoinRoomClick={() => setShowJoinModal(true)}
+        onCreateRoomClick={() => { window.location.hash = 'create-room'; }}
+        onJoinRoomClick={() => { window.location.hash = 'join-room'; }}
         onExitRoomClick={handleExitRoom}
         onKickMember={handleKickMember}
         onMakeAdmin={handleMakeAdmin}
@@ -757,7 +747,10 @@ export default function App() {
       {showCreateModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#121212] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
-            <button onClick={() => setShowCreateModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+            <button onClick={() => {
+              if (window.location.hash === '#create-room') window.history.back();
+              else setShowCreateModal(false);
+            }} className="absolute top-4 right-4 text-gray-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
             <h2 className="text-2xl font-bold mb-6 text-white">Create a Room</h2>
@@ -795,7 +788,10 @@ export default function App() {
       {showJoinModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#121212] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
-            <button onClick={() => setShowJoinModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+            <button onClick={() => {
+              if (window.location.hash === '#join-room') window.history.back();
+              else setShowJoinModal(false);
+            }} className="absolute top-4 right-4 text-gray-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
             <h2 className="text-2xl font-bold mb-6 text-white">Join a Room</h2>
