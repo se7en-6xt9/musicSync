@@ -56,15 +56,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   useEffect(() => {
+    const handleHashChange = () => {
+      setShowMembers(window.location.hash === '#members');
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange(); // init
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (membersRef.current && !membersRef.current.contains(event.target as Node)) {
-        setShowMembers(false);
+        if (showMembers && window.location.hash === '#members') {
+          window.history.back();
+        } else {
+          setShowMembers(false);
+        }
         setActiveMenuId(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [showMembers]);
 
   const handleCopyLink = () => {
     if (roomState) {
@@ -118,13 +131,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
-                if (e.target.value) setActiveTab('search');
+                if (e.target.value) {
+                  setActiveTab('search');
+                  if (window.location.hash !== '#search-suggestions') {
+                    window.location.hash = 'search-suggestions';
+                  }
+                }
               }}
               onFocus={() => {
-                if (query.trim()) setShowSuggestions(true);
+                if (query.trim() && window.location.hash !== '#search-suggestions') {
+                  window.location.hash = 'search-suggestions';
+                }
                 if (query.trim()) setActiveTab('search');
               }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onBlur={() => setTimeout(() => {
+                if (window.location.hash === '#search-suggestions') {
+                  window.history.back();
+                } else {
+                  setShowSuggestions(false);
+                }
+              }, 200)}
               placeholder="Search songs, artists, podcasts..."
               className="block w-full pl-10 pr-10 py-2 sm:py-2.5 border border-white/10 rounded-full leading-5 bg-white/5 text-gray-100 placeholder-gray-400 focus:outline-none focus:bg-white/10 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all text-sm"
             />
@@ -160,7 +186,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           {roomState ? (
             <>
               <button
-                onClick={() => setShowMembers(!showMembers)}
+                onClick={() => {
+                  if (!showMembers) {
+                    window.location.hash = 'members';
+                  } else {
+                    window.history.back();
+                  }
+                }}
                 className={`relative px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium transition-all duration-300 ease-out
                   ${showMembers 
                     ? 'text-emerald-400 bg-white/10 shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)]' 

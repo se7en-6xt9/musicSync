@@ -338,20 +338,44 @@ export default function App() {
     };
   }, [query]);
 
+  // Handle empty state to trap the back button if we reached the root, keeping PWA alive
+  useEffect(() => {
+    if (!window.location.hash || window.location.hash === '#') {
+       window.history.replaceState(null, '', '#base'); // the floor
+       window.history.pushState(null, '', '#home');    // current standard state
+    }
+  }, []);
+
   // Handle browser back button via URL Hash mapping
   useEffect(() => {
     const handleHashChange = () => {
       const h = window.location.hash;
       
+      // TRAP THE APP! Never close the app on back press if we hit the floor.
+      if (h === '#base' || h === '') {
+        window.history.pushState(null, '', '#home');
+        setActiveTab('home');
+        setActiveCategory(null);
+        setQuery('');
+        return;
+      }
+
       // Modals
       setShowCreateModal(h === '#create-room');
       setShowJoinModal(h === '#join-room');
 
-      // (Note: Player #player is handled directly in Player.tsx)
-      if (h === '#player') return;
+      // Navbar state integration
+      if (h === '#search-suggestions') {
+        setShowSuggestions(true);
+      } else {
+        setShowSuggestions(false);
+      }
+
+      // (Note: Player #player is handled directly in Player.tsx, #chat in ChatBubble, #members in Navbar)
+      if (h === '#player' || h === '#chat' || h === '#members') return;
 
       // Base Tabs Navigation
-      if (h === '' || h === '#home') {
+      if (h === '#home') {
         setActiveTab('home');
         setActiveCategory(null);
         setQuery('');
@@ -373,9 +397,13 @@ export default function App() {
     if (e) e.preventDefault();
     if (!query.trim()) return;
     
-    if (window.location.hash !== '#search') {
+    // Check if we are currently looking at search suggestions hash
+    if (window.location.hash === '#search-suggestions') {
+       window.location.replace('#search');
+    } else if (window.location.hash !== '#search') {
       window.location.hash = 'search';
     }
+
     setActiveTab('search');
     setActiveCategory(null);
     setShowSuggestions(false);
@@ -391,9 +419,15 @@ export default function App() {
     const songName = song.name;
     setQuery(songName);
     setShowSuggestions(false);
-    if (window.location.hash !== '#search') {
+    
+    // Check if we are currently looking at search suggestions hash
+    if (window.location.hash === '#search-suggestions') {
+       // Since the next step is looking at #search results, just replace it instead of back -> forward
+       window.location.replace('#search');
+    } else if (window.location.hash !== '#search') {
       window.location.hash = 'search';
     }
+
     setActiveTab('search');
     setActiveCategory(null);
     setSearchPage(1);

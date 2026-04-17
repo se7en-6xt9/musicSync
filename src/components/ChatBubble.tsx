@@ -20,6 +20,15 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentUserId,
   const constraintsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const handleHashChange = () => {
+      setIsOpen(window.location.hash === '#chat');
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange(); // init
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
     if (lastMsg.userId !== currentUserId) {
@@ -35,7 +44,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentUserId,
     if (isOpen) {
       scrollToBottom();
     }
-  }, [messages]);
+  }, [messages, isOpen, currentUserId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -56,6 +65,14 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentUserId,
     if (!inputText.trim()) return;
     onSendMessage(inputText);
     setInputText('');
+  };
+
+  const toggleChat = () => {
+    if (!isOpen) {
+      window.location.hash = 'chat';
+    } else {
+      window.history.back();
+    }
   };
 
   return (
@@ -83,7 +100,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentUserId,
 
         <div 
           className="relative bg-emerald-500/80 backdrop-blur-md text-black w-14 h-14 rounded-full flex items-center justify-center shadow-xl cursor-pointer hover:scale-105 transition-transform"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={toggleChat}
         >
           <MessageCircle size={28} />
           {unreadCount > 0 && !isOpen && (
@@ -109,7 +126,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ messages, currentUserId,
                 <MessageCircle size={18} className="text-emerald-500" />
                 Room Chat
               </h3>
-              <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+              <button onClick={() => window.history.back()} className="text-gray-400 hover:text-white transition-colors">
                 <X size={20} />
               </button>
             </div>
