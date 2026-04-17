@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Home, Search, Users, LogIn, LogOut, Plus, MoreVertical, Shield, UserMinus, Copy, Check } from 'lucide-react';
+import { Home, Search, Users, LogIn, LogOut, Plus, MoreVertical, Shield, UserMinus, Copy, Check, Gamepad2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Song, Room } from '../types';
 
@@ -45,9 +45,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onMakeAdmin
 }) => {
   const [showMembers, setShowMembers] = useState(false);
+  const [showRoomMenu, setShowRoomMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const membersRef = useRef<HTMLDivElement>(null);
+  const roomMenuRef = useRef<HTMLDivElement>(null);
 
   const decodeHtml = (html: string) => {
     const txt = document.createElement('textarea');
@@ -58,6 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   useEffect(() => {
     const handleHashChange = () => {
       setShowMembers(window.location.hash === '#members');
+      setShowRoomMenu(window.location.hash === '#room-menu');
     };
     window.addEventListener('hashchange', handleHashChange);
     handleHashChange(); // init
@@ -74,10 +77,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         }
         setActiveMenuId(null);
       }
+      if (roomMenuRef.current && !roomMenuRef.current.contains(event.target as Node)) {
+        if (showRoomMenu && window.location.hash === '#room-menu') {
+          window.history.back();
+        } else {
+          setShowRoomMenu(false);
+        }
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMembers]);
+  }, [showMembers, showRoomMenu]);
 
   const handleCopyLink = () => {
     if (roomState) {
@@ -181,10 +191,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Right: Room Controls */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0 relative" ref={membersRef}>
+        {/* Right: Games and Room Controls */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 relative">
+          
+          <button
+            onClick={() => {
+              if (activeTab !== 'games') {
+                window.location.hash = 'games';
+                setActiveTab('games');
+              }
+            }}
+            className={`p-2 sm:px-4 sm:py-2 rounded-full flex items-center gap-2 transition-all group ${
+              activeTab === 'games' 
+                ? 'bg-purple-500/10 text-purple-400 shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)] border border-purple-500/20' 
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Gamepad2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline font-medium text-sm">Games</span>
+          </button>
+
           {roomState ? (
-            <>
+            <div className="relative" ref={membersRef}>
               <button
                 onClick={() => {
                   if (!showMembers) {
@@ -202,13 +230,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Users className="w-4 h-4 relative z-10" />
                 <span className="relative z-10 hidden sm:inline">Members ({roomState.members.length})</span>
-              </button>
-              <button
-                onClick={onExitRoomClick}
-                className="px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Exit</span>
               </button>
 
               {/* Members Dropdown */}
@@ -277,42 +298,91 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ))}
                     </div>
 
-                    <div className="p-4 border-t border-white/10 bg-white/5 mt-auto">
+                    <div className="p-4 border-t border-white/10 bg-white/5 mt-auto space-y-3">
                       <div className="flex items-center justify-between bg-black/40 rounded-xl p-3 border border-white/5">
                         <div className="flex flex-col">
                           <span className="text-xs text-gray-400">Room Code</span>
                           <span className="text-lg font-mono font-bold text-emerald-400 tracking-widest">{roomState.code}</span>
                         </div>
-                        <button 
-                          onClick={handleCopyLink}
-                          className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors"
-                          title="Copy Join Link"
-                        >
-                          {copied ? <Check className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={onExitRoomClick}
+                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors flex items-center gap-1"
+                            title="Exit Room"
+                          >
+                            <LogOut className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={handleCopyLink}
+                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors"
+                            title="Copy Join Link"
+                          >
+                            {copied ? <Check className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-            </>
+            </div>
           ) : (
-            <>
+            <div className="relative" ref={roomMenuRef}>
               <button
-                onClick={onJoinRoomClick}
-                className="px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-all"
+                onClick={() => {
+                  if (!showRoomMenu) {
+                    window.location.hash = 'room-menu';
+                  } else {
+                    window.history.back();
+                  }
+                }}
+                className={`relative px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium transition-all duration-300 ease-out
+                  ${showRoomMenu 
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)]' 
+                    : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
+                  }
+                `}
               >
-                <LogIn className="w-4 h-4" />
-                <span className="hidden sm:inline">Join Room</span>
+                <Users className="w-5 h-5" />
+                <span className="hidden sm:inline">Room</span>
               </button>
-              <button
-                onClick={onCreateRoomClick}
-                className="px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Create Room</span>
-              </button>
-            </>
+
+              {/* Room Action Dropdown */}
+              <AnimatePresence>
+                {showRoomMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute top-full right-0 mt-4 w-56 bg-[#121212]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col p-2 space-y-1"
+                  >
+                     <button
+                        onClick={() => {
+                          setShowRoomMenu(false);
+                          if (window.location.hash === '#room-menu') window.history.back();
+                          onJoinRoomClick();
+                        }}
+                        className="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all"
+                      >
+                        <LogIn className="w-5 h-5" />
+                        Join Room
+                      </button>
+                      <button
+                        onClick={() => {
+                           setShowRoomMenu(false);
+                           if (window.location.hash === '#room-menu') window.history.back();
+                           onCreateRoomClick();
+                        }}
+                        className="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Create Room
+                      </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )}
         </div>
       </div>
