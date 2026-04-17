@@ -483,42 +483,106 @@ export default function App() {
     }
   };
 
-  const handleNext = async () => {
-    if (!currentSong || queue.length === 0) return;
-    const currentIndex = queue.findIndex(s => s.id === currentSong.id);
-    
-    // Infinite Autoplay: If we reached the end of the queue
-    if (currentIndex === queue.length - 1 || currentIndex === -1) {
+  const autoplayStateRef = useRef({ query: '', page: 1 });
+
+  const fetchAndAppendUpNext = async (currentQ: Song[]): Promise<Song[]> => {
+    if (currentQ.length === 0) return [];
+
+    let newSongsOut: Song[] = [];
+
+    // Tries to fetch seeds branching off up to the last 3 songs
+    for (let offset = 1; offset <= Math.min(3, currentQ.length); offset++) {
+      const seedSong = currentQ[currentQ.length - offset];
+      
+      let artistName = '';
+      if (typeof seedSong.primaryArtists === 'string') {
+        artistName = seedSong.primaryArtists.split(',')[0].trim();
+      } else if (Array.isArray(seedSong.primaryArtists) && seedSong.primaryArtists.length > 0) {
+        const firstArtist = seedSong.primaryArtists[0];
+        artistName = typeof firstArtist === 'string' ? firstArtist : (firstArtist.name || '');
+      }
+
+      if (!artistName) artistName = 'bollywood';
+
+      let pageToFetch = 1;
+      if (autoplayStateRef.current.query === artistName) {
+         pageToFetch = autoplayStateRef.current.page + 1;
+      }
+
       try {
-        const similar = await getSimilarSongs(currentSong);
-        if (similar.length > 0) {
-           const existingIds = new Set(queue.map(s => s.id));
-           const newSongs = similar.filter(s => !existingIds.has(s.id));
-           
-           if (newSongs.length > 0) {
-              const newQueue = [...queue, ...newSongs];
-              setQueue(newQueue);
-              
-              const nextSong = newSongs[0];
-              setCurrentSong(nextSong);
-              setIsPlaying(true);
-              addToRecentlyPlayed(nextSong);
-              emitPlaybackSync(nextSong, true, newQueue, 0);
-              return;
-           }
-        }
+         const results = await searchSongs(artistName, pageToFetch);
+         const existingIds = new Set(currentQ.map(s => s.id));
+         const newUnique = results.filter(s => !existingIds.has(s.id));
+
+         if (newUnique.length > 0) {
+            autoplayStateRef.current = { query: artistName, page: pageToFetch };
+            newSongsOut = newUnique;
+
+            setQueue(prevQueue => {
+                const finalExistingIds = new Set(prevQueue.map(s => s.id));
+                const finalUnique = results.filter(s => !finalExistingIds.has(s.id));
+                if (finalUnique.length > 0) {
+                    const newQueue = [...prevQueue, ...finalUnique];
+                    emitPlaybackSync(currentSong, isPlaying, newQueue, undefined);
+                    return newQueue;
+                }
+                return prevQueue;
+            });
+            break; // Stop branching, we found new songs
+         } else {
+            // Found results but all duplicates, or no results. Mark the page checked
+            autoplayStateRef.current = { query: artistName, page: pageToFetch };
+         }
       } catch (err) {
-        console.error("Failed to load infinite songs", err);
+         console.error("Autoplay fetch error", err);
       }
     }
 
-    // Normal next
-    const nextIndex = (currentIndex + 1) % queue.length;
-    const nextSong = queue[nextIndex];
+    // Ultimate chain reaction fallback: random trending picks if artist search fails
+    if (newSongsOut.length === 0) {
+        try {
+           const fallbackQueries = ['top hits', 'trending', 'party', 'lofi indie'];
+           const fq = fallbackQueries[Math.floor(Math.random() * fallbackQueries.length)];
+           const results = await searchSongs(fq, 1);
+           const existingIds = new Set(currentQ.map(s => s.id));
+           const newUnique = results.filter(s => !existingIds.has(s.id));
+
+           if (newUnique.length > 0) {
+                autoplayStateRef.current = { query: fq, page: 1 };
+                newSongsOut = newUnique;
+                setQueue(prevQueue => {
+                    const finalExistingIds = new Set(prevQueue.map(s => s.id));
+                    const finalUnique = results.filter(s => !finalExistingIds.has(s.id));
+                    const newQueue = [...prevQueue, ...finalUnique];
+                    emitPlaybackSync(currentSong, isPlaying, newQueue, undefined);
+                    return newQueue;
+                });
+           }
+        } catch(e) {}
+    }
+
+    return newSongsOut;
+  };
+
+  const handleNext = async () => {
+    if (!currentSong || queue.length === 0) return;
+    const currentIndex = queue.findIndex(s => s.id === currentSong.id);
+    let currentQueueToUse = queue;
+    
+    // Infinite Autoplay: Fetch right before switching if we reached the end
+    if (currentIndex === queue.length - 1 || currentIndex === -1) {
+      const newSongs = await fetchAndAppendUpNext(queue);
+      if (newSongs.length > 0) {
+         currentQueueToUse = [...queue, ...newSongs];
+      }
+    }
+
+    const nextIndex = (currentQueueToUse.findIndex(s => s.id === currentSong.id) + 1) % currentQueueToUse.length;
+    const nextSong = currentQueueToUse[nextIndex];
     setCurrentSong(nextSong);
     setIsPlaying(true);
     addToRecentlyPlayed(nextSong);
-    emitPlaybackSync(nextSong, true, queue, 0);
+    emitPlaybackSync(nextSong, true, currentQueueToUse, 0);
   };
 
   const handlePrevious = () => {
@@ -533,25 +597,7 @@ export default function App() {
   };
 
   const handleLoadMoreUpNext = async () => {
-    if (queue.length === 0) return;
-    const lastSong = queue[queue.length - 1]; // fetch based on the very last song in queue
-    try {
-      const similar = await getSimilarSongs(lastSong);
-      if (similar.length > 0) {
-        setQueue(prevQueue => {
-          const existingIds = new Set(prevQueue.map(s => s.id));
-          const newSongs = similar.filter(s => !existingIds.has(s.id));
-          if (newSongs.length > 0) {
-            const newQueue = [...prevQueue, ...newSongs];
-            emitPlaybackSync(currentSong, isPlaying, newQueue, undefined);
-            return newQueue;
-          }
-          return prevQueue;
-        });
-      }
-    } catch (err) {
-      console.error("Failed to load more up next songs", err);
-    }
+    await fetchAndAppendUpNext(queue);
   };
 
   const handlePlayPause = (play: boolean, time?: number) => {
