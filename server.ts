@@ -21,9 +21,50 @@ async function startServer() {
 
   // Room state
   const rooms = new Map();
+  
+  // Ludo offline game state
+  // key: gameId, value: { state: any, createdAt: number }
+  const ludoGames = new Map();
+
+  // Garbage collection: Run every 1 hr to clear 24h old Ludo games
+  setInterval(() => {
+    const now = Date.now();
+    for (const [gameId, gameInfo] of ludoGames.entries()) {
+      if (now - gameInfo.createdAt > 24 * 60 * 60 * 1000) {
+        ludoGames.delete(gameId);
+      }
+    }
+  }, 60 * 60 * 1000);
 
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
+
+    // Ludo Sync Events
+    socket.on("ludo_create_game", ({ gameId, gameState }) => {
+      ludoGames.set(gameId, {
+        state: gameState,
+        createdAt: Date.now()
+      });
+      socket.join(gameId); // For syncing and reconnections
+    });
+
+    socket.on("ludo_sync_state", ({ gameId, gameState }) => {
+      if (ludoGames.has(gameId)) {
+        const gameInfo = ludoGames.get(gameId);
+        gameInfo.state = gameState;
+        // Optionally broadcast if others are watching or for online mode later
+        socket.to(gameId).emit("ludo_state_update", gameState);
+      }
+    });
+
+    socket.on("ludo_reconnect", (gameId, callback) => {
+      if (ludoGames.has(gameId)) {
+        socket.join(gameId);
+        callback({ success: true, gameState: ludoGames.get(gameId).state });
+      } else {
+        callback({ success: false });
+      }
+    });
 
     socket.on("create_room", ({ roomId, roomName, user }) => {
       const room = {
@@ -141,6 +182,23 @@ async function startServer() {
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // Music API Proxy to bypass CORS
+  app.get("/api/music/*", async (req: any, res: any) => {
+    const musicPath = req.params[0];
+    const queryParams = new URLSearchParams(req.query as any).toString();
+    const targetUrl = `https://jiosaavn-api-privatecvc2.vercel.app/${musicPath}?${queryParams}`;
+    
+    try {
+      const response = await fetch(targetUrl);
+      if (!response.ok) throw new Error(`API responded with status: ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Music API Proxy Error:", error);
+      res.status(500).json({ status: "FAILED", message: "Proxy fetch failed" });
+    }
   });
 
   // Vite middleware for development
