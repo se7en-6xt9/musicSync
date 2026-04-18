@@ -30,7 +30,6 @@ interface NavbarProps {
   onPlayPause?: (play: boolean) => void;
   onNext?: () => void;
   onPrevious?: () => void;
-  onCollapseNav?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -55,8 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isPlaying,
   onPlayPause,
   onNext,
-  onPrevious,
-  onCollapseNav
+  onPrevious
 }) => {
   const [showMembers, setShowMembers] = useState(false);
   const [showRoomMenu, setShowRoomMenu] = useState(false);
@@ -169,13 +167,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span className="text-sm text-gray-400 flex items-center gap-2"><Music size={16} /> No song playing</span>
                  )}
                </div>
-               <button 
-                 className="w-10 sm:w-12 h-full bg-red-500/10 text-red-400 border border-red-500/20 rounded-full flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0" 
-                 onClick={onCollapseNav}
-                 title="Minimize Navbar"
-               >
-                 <X size={18} />
-               </button>
              </div>
           ) : (
             <>
