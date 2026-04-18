@@ -30,9 +30,9 @@ export interface Song {
   releaseDate: string;
   duration: number;
   label: string;
-  primaryArtists: string;
+  primaryArtists: string | any[];
   primaryArtistsId: string;
-  featuredArtists: string;
+  featuredArtists: string | any[];
   featuredArtistsId: string;
   explicitContent: number;
   playCount: number;

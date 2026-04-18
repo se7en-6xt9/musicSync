@@ -37,6 +37,8 @@ export default function App() {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const gameUrl = import.meta.env.VITE_GAME_URL || 'https://melodygames.vercel.app';
   
   const [searchPage, setSearchPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -736,7 +738,10 @@ export default function App() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-8 flex flex-col gap-4 relative z-10">
+      <main 
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-8 flex flex-col gap-4 relative z-10"
+        style={{ display: activeTab === 'games' ? 'none' : 'flex' }}
+      >
         
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-32 gap-4 text-emerald-500">
@@ -804,22 +809,8 @@ export default function App() {
             </div>
           </section>
         ) : activeTab === 'games' ? (
-          // Games View (Coming Soon)
-          <section className="pt-12 sm:pt-20 flex flex-col items-center justify-center min-h-[50vh] text-center">
-            <div className="relative mb-8 group">
-               <div className="absolute inset-0 bg-purple-500/30 blur-3xl rounded-full group-hover:bg-purple-500/50 transition-colors duration-500"></div>
-               <Gamepad2 className="w-24 h-24 text-purple-400 relative z-10 animate-bounce group-hover:scale-110 transition-transform duration-300" />
-            </div>
-            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">
-              Melody Arcade
-            </h2>
-            <div className="inline-block px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-md mb-6 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-               <span className="text-sm font-bold uppercase tracking-wider text-emerald-400">Coming Soon</span>
-            </div>
-            <p className="text-gray-400 text-lg max-w-lg mx-auto">
-              Get ready to play synced multiplayer games like Guess The Song, Ludo, and Karaoke with your friends while vibing to the same music.
-            </p>
-          </section>
+          // Games View is now handled globally via Iframe
+          <div className="hidden" />
         ) : (
           // Home View
           <div>
@@ -846,6 +837,31 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Games Global Layer */}
+      <div 
+        className="fixed inset-0 w-full h-full z-0 bg-transparent"
+        style={{ display: activeTab === 'games' ? 'block' : 'none' }}
+      >
+        <iframe
+          ref={iframeRef}
+          src={gameUrl}
+          style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 }}
+          className="border-none bg-transparent"
+          title="Melody Games"
+          allow="microphone; camera; display-capture; autoplay"
+          onLoad={() => {
+            if (iframeRef.current && iframeRef.current.contentWindow) {
+              const targetOrigin = gameUrl.startsWith('http') ? new URL(gameUrl).origin : '*';
+              iframeRef.current.contentWindow.postMessage({
+                type: 'AUTH_SYNC',
+                id: currentUserId,
+                username: userName || 'Guest'
+              }, targetOrigin);
+            }
+          }}
+        />
+      </div>
 
       {/* Player */}
       <Player 
