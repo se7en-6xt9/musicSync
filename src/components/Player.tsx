@@ -18,6 +18,7 @@ interface PlayerProps {
   onTimeUpdate?: (time: number) => void;
   onSendReaction?: (reaction: string) => void;
   onLoadMoreUpNext?: () => void;
+  hideMiniPlayer?: boolean;
 }
 
 export const Player: React.FC<PlayerProps> = ({ 
@@ -32,7 +33,8 @@ export const Player: React.FC<PlayerProps> = ({
   onSeek,
   onTimeUpdate,
   onSendReaction,
-  onLoadMoreUpNext
+  onLoadMoreUpNext,
+  hideMiniPlayer = false
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [progress, setProgress] = useState(0);
@@ -375,63 +377,65 @@ export const Player: React.FC<PlayerProps> = ({
       </AnimatePresence>
 
       {/* Mini Player (Bottom Bar) */}
-      <motion.div 
-        className="fixed bottom-0 left-0 right-0 bg-[#121212]/90 backdrop-blur-xl border-t border-white/10 px-4 py-2 z-40 cursor-pointer"
-        onClick={expandPlayer}
-        layoutId="player-bar"
-      >
-        {/* Progress Bar (Top edge of mini player) */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-white/10">
-          <div 
-            className="h-full bg-emerald-500 transition-all duration-100 ease-linear"
-            style={{ width: `${(progress / (duration || 1)) * 100}%` }}
-          />
-        </div>
-
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 h-14">
-          
-          {/* Song Info */}
-          <div className="flex items-center gap-3 w-1/2 sm:w-1/3 min-w-0">
-            <motion.img 
-              layoutId={`artwork-${currentSong.id}`}
-              src={imageUrl || undefined} 
-              alt="Cover" 
-              className="w-12 h-12 rounded-md object-cover shadow-md"
-              referrerPolicy="no-referrer"
+      {!hideMiniPlayer && (
+        <motion.div 
+          className="fixed bottom-0 left-0 right-0 bg-[#121212]/90 backdrop-blur-xl border-t border-white/10 px-4 py-2 z-40 cursor-pointer"
+          onClick={expandPlayer}
+          layoutId="player-bar"
+        >
+          {/* Progress Bar (Top edge of mini player) */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-white/10">
+            <div 
+              className="h-full bg-emerald-500 transition-all duration-100 ease-linear"
+              style={{ width: `${(progress / (duration || 1)) * 100}%` }}
             />
-            <div className="flex flex-col min-w-0">
-              <h4 className="text-white font-medium truncate text-sm" dangerouslySetInnerHTML={{ __html: currentSong.name }} />
-              <p className="text-gray-400 text-xs truncate" dangerouslySetInnerHTML={{ __html: currentSong.primaryArtists || 'Unknown Artist' }} />
+          </div>
+
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 h-14">
+            
+            {/* Song Info */}
+            <div className="flex items-center gap-3 w-1/2 sm:w-1/3 min-w-0">
+              <motion.img 
+                layoutId={`artwork-${currentSong.id}`}
+                src={imageUrl || undefined} 
+                alt="Cover" 
+                className="w-12 h-12 rounded-md object-cover shadow-md"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex flex-col min-w-0">
+                <h4 className="text-white font-medium truncate text-sm" dangerouslySetInnerHTML={{ __html: currentSong.name }} />
+                <p className="text-gray-400 text-xs truncate" dangerouslySetInnerHTML={{ __html: currentSong.primaryArtists || 'Unknown Artist' }} />
+              </div>
             </div>
-          </div>
 
-          {/* Controls */}
-          <div 
-            className="flex items-center justify-end sm:justify-center gap-4 w-1/2 sm:w-1/3" 
-            onClick={e => e.stopPropagation()}
-            onPointerDown={e => e.stopPropagation()}
-          >
-            <button onClick={(e) => { e.stopPropagation(); onPrevious(); }} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
-              <SkipBack size={20} className="fill-current" />
-            </button>
-            <button 
-              onClick={(e) => { e.stopPropagation(); onPlayPause(!isPlaying, audioRef.current?.currentTime); }}
-              className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full hover:scale-105 transition-transform"
+            {/* Controls */}
+            <div 
+              className="flex items-center justify-end sm:justify-center gap-4 w-1/2 sm:w-1/3" 
+              onClick={e => e.stopPropagation()}
+              onPointerDown={e => e.stopPropagation()}
             >
-              {isPlaying ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-1" />}
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
-              <SkipForward size={20} className="fill-current" />
-            </button>
-          </div>
+              <button onClick={(e) => { e.stopPropagation(); onPrevious(); }} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
+                <SkipBack size={20} className="fill-current" />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onPlayPause(!isPlaying, audioRef.current?.currentTime); }}
+                className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full hover:scale-105 transition-transform"
+              >
+                {isPlaying ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-1" />}
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="hidden sm:block text-gray-400 hover:text-white transition-colors">
+                <SkipForward size={20} className="fill-current" />
+              </button>
+            </div>
 
-          {/* Expand Icon (Desktop) */}
-          <div className="hidden sm:flex items-center justify-end w-1/3">
-            <ChevronUp size={24} className="text-gray-400" />
+            {/* Expand Icon (Desktop) */}
+            <div className="hidden sm:flex items-center justify-end w-1/3">
+              <ChevronUp size={24} className="text-gray-400" />
+            </div>
+            
           </div>
-          
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
     </>
   );
 };

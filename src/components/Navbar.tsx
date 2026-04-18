@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Home, Search, Users, LogIn, LogOut, Plus, MoreVertical, Shield, UserMinus, Copy, Check, Gamepad2 } from 'lucide-react';
+import { Home, Search, Users, LogIn, LogOut, Plus, MoreVertical, Shield, UserMinus, Copy, Check, Gamepad2, Play, Pause, SkipBack, SkipForward, X, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Song, Room } from '../types';
+import { getHighestQualityImage } from '../services/api';
 
 interface NavbarProps {
   activeTab: string;
@@ -23,6 +24,13 @@ interface NavbarProps {
   onExitRoomClick: () => void;
   onKickMember: (memberId: string) => void;
   onMakeAdmin: (memberId: string) => void;
+
+  currentSong?: Song | null;
+  isPlaying?: boolean;
+  onPlayPause?: (play: boolean) => void;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  onCollapseNav?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -42,7 +50,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   onJoinRoomClick,
   onExitRoomClick,
   onKickMember,
-  onMakeAdmin
+  onMakeAdmin,
+  currentSong,
+  isPlaying,
+  onPlayPause,
+  onNext,
+  onPrevious,
+  onCollapseNav
 }) => {
   const [showMembers, setShowMembers] = useState(false);
   const [showRoomMenu, setShowRoomMenu] = useState(false);
@@ -130,64 +144,99 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="relative z-10 hidden sm:inline">Home</span>
         </button>
 
-        {/* Center: Search Bar */}
+        {/* Center: Search Bar or Mini Player (Game Mode) */}
         <div className="flex-1 relative max-w-2xl">
-          <form onSubmit={onSearchSubmit} className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-            </div>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                if (e.target.value) {
-                  setActiveTab('search');
-                  if (window.location.hash !== '#search-suggestions') {
-                    window.location.hash = 'search-suggestions';
-                  }
-                }
-              }}
-              onFocus={() => {
-                if (query.trim() && window.location.hash !== '#search-suggestions') {
-                  window.location.hash = 'search-suggestions';
-                }
-                if (query.trim()) setActiveTab('search');
-              }}
-              onBlur={() => setTimeout(() => {
-                if (window.location.hash === '#search-suggestions') {
-                  window.history.back();
-                } else {
-                  setShowSuggestions(false);
-                }
-              }, 200)}
-              placeholder="Search songs, artists, podcasts..."
-              className="block w-full pl-10 pr-10 py-2 sm:py-2.5 border border-white/10 rounded-full leading-5 bg-white/5 text-gray-100 placeholder-gray-400 focus:outline-none focus:bg-white/10 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all text-sm"
-            />
-            {isSearching && (
-              <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </form>
-
-          {/* Suggestions Dropdown */}
-          {showSuggestions && searchSuggestions.length > 0 && (
-            <div className="absolute mt-2 w-full bg-[#121212]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
-              {searchSuggestions.map((song) => (
-                <div 
-                  key={song.id}
-                  onClick={() => onSuggestionClick(song)}
-                  className="flex items-center gap-3 p-3 hover:bg-white/10 cursor-pointer transition-colors"
-                >
-                  <Search className="w-4 h-4 text-gray-400" />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-medium text-white truncate">{decodeHtml(song.name)}</span>
-                    <span className="text-xs text-gray-400 truncate">{decodeHtml(song.primaryArtists || 'Unknown')}</span>
-                  </div>
+          {activeTab === 'games' ? (
+             <div className="flex w-full items-center gap-2 h-10 sm:h-[44px]">
+               <div 
+                 className="flex-1 flex items-center bg-white/10 rounded-full px-4 h-full cursor-pointer hover:bg-white/20 transition-colors shadow-inner"
+                 onClick={() => window.location.hash = 'player'}
+               >
+                 {currentSong ? (
+                    <>
+                      <img src={getHighestQualityImage(currentSong.image) || undefined} className="w-6 h-6 sm:w-7 sm:h-7 rounded-full sm:rounded-md mr-3 object-cover shadow-sm" alt="" referrerPolicy="no-referrer" />
+                      <div className="flex flex-col flex-1 min-w-0 overflow-hidden text-left">
+                         <span className="text-sm font-semibold text-white truncate" dangerouslySetInnerHTML={{ __html: currentSong.name }}></span>
+                         <span className="text-[10px] sm:text-xs text-gray-400 truncate" dangerouslySetInnerHTML={{ __html: currentSong.primaryArtists || 'Unknown Artist' }}></span>
+                      </div>
+                      <div className="flex items-center gap-2 sm:gap-3 ml-2" onClick={e => e.stopPropagation()}>
+                         <button onClick={onPrevious} className="text-gray-300 hover:text-white transition-colors hidden sm:block"><SkipBack size={16} className="fill-current" /></button>
+                         <button onClick={() => onPlayPause && onPlayPause(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-emerald-500 text-black rounded-full hover:scale-105 transition-transform"><span className={isPlaying ? "" : "ml-0.5"}>{isPlaying ? <Pause size={14} className="fill-current" /> : <Play size={14} className="fill-current" />}</span></button>
+                         <button onClick={onNext} className="text-gray-300 hover:text-white transition-colors"><SkipForward size={16} className="fill-current" /></button>
+                      </div>
+                    </>
+                 ) : (
+                    <span className="text-sm text-gray-400 flex items-center gap-2"><Music size={16} /> No song playing</span>
+                 )}
+               </div>
+               <button 
+                 className="w-10 sm:w-12 h-full bg-red-500/10 text-red-400 border border-red-500/20 rounded-full flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0" 
+                 onClick={onCollapseNav}
+                 title="Minimize Navbar"
+               >
+                 <X size={18} />
+               </button>
+             </div>
+          ) : (
+            <>
+              <form onSubmit={onSearchSubmit} className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
                 </div>
-              ))}
-            </div>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    if (e.target.value) {
+                      setActiveTab('search');
+                      if (window.location.hash !== '#search-suggestions') {
+                        window.location.hash = 'search-suggestions';
+                      }
+                    }
+                  }}
+                  onFocus={() => {
+                    if (query.trim() && window.location.hash !== '#search-suggestions') {
+                      window.location.hash = 'search-suggestions';
+                    }
+                    if (query.trim()) setActiveTab('search');
+                  }}
+                  onBlur={() => setTimeout(() => {
+                    if (window.location.hash === '#search-suggestions') {
+                      window.history.back();
+                    } else {
+                      setShowSuggestions(false);
+                    }
+                  }, 200)}
+                  placeholder="Search songs, artists, podcasts..."
+                  className="block w-full pl-10 pr-10 py-2 sm:py-2.5 border border-white/10 rounded-full leading-5 bg-white/5 text-gray-100 placeholder-gray-400 focus:outline-none focus:bg-white/10 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all text-sm"
+                />
+                {isSearching && (
+                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                    <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </form>
+
+              {/* Suggestions Dropdown */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute mt-2 w-full bg-[#121212]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                  {searchSuggestions.map((song) => (
+                    <div 
+                      key={song.id}
+                      onClick={() => onSuggestionClick(song)}
+                      className="flex items-center gap-3 p-3 hover:bg-white/10 cursor-pointer transition-colors"
+                    >
+                      <Search className="w-4 h-4 text-gray-400" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-medium text-white truncate">{decodeHtml(song.name)}</span>
+                        <span className="text-xs text-gray-400 truncate">{decodeHtml(song.primaryArtists || 'Unknown')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 

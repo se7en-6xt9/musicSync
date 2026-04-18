@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Music, Loader2, Sparkles, Clock, Flame, HeartCrack, PartyPopper, Disc3, Mic2, ListMusic, X, ArrowLeft, Gamepad2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { io, Socket } from 'socket.io-client';
 import { Song, Room, RoomMember, ChatMessage } from './types';
 import { searchSongs, getTrendingSongs, getCategorySongs, getSimilarSongs } from './services/api';
@@ -44,6 +45,7 @@ export default function App() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [homeCategoryIndex, setHomeCategoryIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<{title: string, query: string} | null>(null);
+  const [isNavbarCollapsed, setIsNavbarCollapsed] = useState(false);
   const extraCategories = ['Romantic', 'Workout', 'Chill', '90s Bollywood', 'Devotional', 'Pop', 'Indie', 'Punjabi', 'Lo-Fi'];
 
   // Room State
@@ -714,28 +716,51 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-24 font-sans selection:bg-emerald-500/30 relative">
       
-      <Navbar 
-        activeTab={activeTab}
-        setActiveTab={(tab) => {
-          setActiveTab(tab);
-          if (tab === 'home') setActiveCategory(null);
-        }}
-        query={query}
-        setQuery={setQuery}
-        onSearchSubmit={handleSearchSubmit}
-        isSearching={isSearching}
-        showSuggestions={showSuggestions}
-        setShowSuggestions={setShowSuggestions}
-        searchSuggestions={searchSuggestions}
-        onSuggestionClick={handleSuggestionClick}
-        roomState={roomState}
-        currentUserId={currentUserId}
-        onCreateRoomClick={() => { window.location.replace('#create-room'); }}
-        onJoinRoomClick={() => { window.location.replace('#join-room'); }}
-        onExitRoomClick={handleExitRoom}
-        onKickMember={handleKickMember}
-        onMakeAdmin={handleMakeAdmin}
-      />
+      {/* Draggable Bubble (when Navbar is collapsed) */}
+      {isNavbarCollapsed && activeTab === 'games' && (
+        <motion.div
+          drag
+          dragMomentum={false}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="fixed top-24 right-6 z-[100] w-14 h-14 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.5)] cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+          onClick={() => setIsNavbarCollapsed(false)}
+        >
+          <Music className="text-black" size={26} />
+        </motion.div>
+      )}
+
+      {/* Main Navbar */}
+      <div style={{ display: isNavbarCollapsed && activeTab === 'games' ? 'none' : 'block' }}>
+        <Navbar 
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            if (tab === 'home') setActiveCategory(null);
+          }}
+          query={query}
+          setQuery={setQuery}
+          onSearchSubmit={handleSearchSubmit}
+          isSearching={isSearching}
+          showSuggestions={showSuggestions}
+          setShowSuggestions={setShowSuggestions}
+          searchSuggestions={searchSuggestions}
+          onSuggestionClick={handleSuggestionClick}
+          roomState={roomState}
+          currentUserId={currentUserId}
+          onCreateRoomClick={() => { window.location.replace('#create-room'); }}
+          onJoinRoomClick={() => { window.location.replace('#join-room'); }}
+          onExitRoomClick={handleExitRoom}
+          onKickMember={handleKickMember}
+          onMakeAdmin={handleMakeAdmin}
+          currentSong={currentSong}
+          isPlaying={isPlaying}
+          onPlayPause={handlePlayPause}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onCollapseNav={() => setIsNavbarCollapsed(true)}
+        />
+      </div>
 
       {/* Main Content */}
       <main 
@@ -877,6 +902,7 @@ export default function App() {
         onTimeUpdate={(time) => { currentTimeRef.current = time; }}
         onSendReaction={roomState ? handleSendReaction : undefined}
         onLoadMoreUpNext={handleLoadMoreUpNext}
+        hideMiniPlayer={activeTab === 'games'}
       />
 
       {/* Floating Reactions */}
