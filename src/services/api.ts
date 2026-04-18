@@ -1,6 +1,6 @@
 import { Song } from '../types';
 
-const BASE_URL = '/api/music'; // Root-relative to current domain
+const BASE_URL = typeof window !== 'undefined' ? `${window.location.origin}/api/music` : '/api/music';
 
 export const searchSongs = async (query: string, page: number = 1): Promise<Song[]> => {
   try {

@@ -184,14 +184,21 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Request Logger
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+  });
+
   // Music API Proxy to bypass CORS and prevent IP blocking in production
   app.get("/api/music/*", async (req: any, res: any) => {
     const musicPath = req.params[0];
     const queryParams = new URLSearchParams(req.query as any).toString();
     const targetUrl = `https://jiosaavn-api-privatecvc2.vercel.app/${musicPath}?${queryParams}`;
+    const backupUrl = `https://saavn.dev/api/${musicPath}?${queryParams}`; // Potential mirror
     
     try {
-      const response = await fetch(targetUrl, {
+      let response = await fetch(targetUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'application/json',
@@ -200,7 +207,16 @@ async function startServer() {
       });
       
       if (!response.ok) {
-        console.error(`Proxy: Target API error ${response.status} for ${targetUrl}`);
+        console.warn(`Proxy: Primary failed, trying backup for ${musicPath}`);
+        response = await fetch(backupUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          }
+        });
+      }
+      
+      if (!response.ok) {
+        console.error(`Proxy: Target API error ${response.status} for both URLs`);
         return res.status(response.status).json({ status: "FAILED", message: "Upstream API error" });
       }
       
