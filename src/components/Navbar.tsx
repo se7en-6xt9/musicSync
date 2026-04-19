@@ -115,14 +115,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-6xl">
       <div className="flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 py-2 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.5)] relative">
         
-        {/* Left: Home Button */}
+        {/* Left: Home Button Tracker & Logo */}
         <button
           onClick={() => {
-            if (activeTab !== 'home') {
-              window.location.hash = 'home';
-            }
+            window.location.hash = 'home';
             setActiveTab('home');
             setQuery('');
+            setShowSuggestions(false);
+            window.scrollTo(0, 0);
           }}
           className={`relative px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium transition-all duration-300 ease-out shrink-0
             ${activeTab === 'home' 
@@ -199,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setShowSuggestions(false);
                     }
                   }, 200)}
-                  placeholder="Search songs, artists, podcasts..."
+                  placeholder="Search songs, artists, languages..."
                   className="block w-full pl-10 pr-10 py-2 sm:py-2.5 border border-white/10 rounded-full leading-5 bg-white/5 text-gray-100 placeholder-gray-400 focus:outline-none focus:bg-white/10 focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all text-sm"
                 />
                 {isSearching && (

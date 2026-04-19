@@ -22,10 +22,43 @@ export const SongSection: React.FC<SongSectionProps> = ({
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const [hasFetchedInitial, setHasFetchedInitial] = useState(initialSongs.length > 0);
 
   useEffect(() => {
-    setSongs(initialSongs);
+    if (initialSongs.length > 0) {
+      setSongs(initialSongs);
+      setHasFetchedInitial(true);
+    }
   }, [initialSongs]);
+
+  useEffect(() => {
+    if (hasFetchedInitial || query === 'recent' || query === 'trending') return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setIsLoading(true);
+        const fetchQuery = query === 'trending' ? 'top hits' : query;
+        getCategorySongs(fetchQuery, 1).then(newSongs => {
+          if (newSongs.length > 0) {
+            setSongs(newSongs);
+          }
+          setHasFetchedInitial(true);
+          setIsLoading(false);
+        }).catch(() => {
+          setHasFetchedInitial(true);
+          setIsLoading(false);
+        });
+        observer.disconnect();
+      }
+    }, { rootMargin: "600px" });
+
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasFetchedInitial, query]);
 
   const handleScroll = async () => {
     if (!scrollContainerRef.current || isLoading || query === 'recent') return;
@@ -57,10 +90,26 @@ export const SongSection: React.FC<SongSectionProps> = ({
     }
   };
 
+  if(!hasFetchedInitial && songs.length === 0 && query !== 'recent' && query !== 'trending') {
+    return (
+      <section ref={sectionRef} className="mb-12">
+        <div className="flex items-center gap-2 mb-6 px-2">
+          {icon}
+          <div className="h-8 bg-white/10 rounded w-48 animate-pulse"></div>
+        </div>
+        <div className="flex gap-4 sm:gap-6 overflow-x-hidden pb-6 pt-2 px-2 animate-pulse">
+          {[...Array(6)].map((_, i) => (
+             <div key={i} className="flex-none w-[160px] sm:w-[200px] h-[220px] sm:h-[280px] bg-white/5 rounded-xl"></div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   if (songs.length === 0) return null;
 
   return (
-    <section className="mb-12">
+    <section ref={sectionRef} className="mb-12">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           {icon}

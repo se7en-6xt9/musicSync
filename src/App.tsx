@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Music, Loader2, Sparkles, Clock, Flame, HeartCrack, PartyPopper, Disc3, Mic2, ListMusic, X, ArrowLeft, Gamepad2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { io, Socket } from 'socket.io-client';
 import { Song, Room, RoomMember, ChatMessage } from './types';
+import { POPULAR_ARTISTS, DEVOTIONAL_GODS } from './data/entities';
 import { searchSongs, getTrendingSongs, getCategorySongs, getSimilarSongs } from './services/api';
 import { SongCard } from './components/SongCard';
 import { SongSection } from './components/SongSection';
+import { ArtistScroll } from './components/ArtistScroll';
+import { GodScroll } from './components/GodScroll';
 import { Player } from './components/Player';
 import { Navbar } from './components/Navbar';
 import { ChatBubble } from './components/ChatBubble';
@@ -20,10 +23,8 @@ export default function App() {
   
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
-  const [sadSongs, setSadSongs] = useState<Song[]>([]);
-  const [partySongs, setPartySongs] = useState<Song[]>([]);
-  const [remixSongs, setRemixSongs] = useState<Song[]>([]);
-  const [artistSongs, setArtistSongs] = useState<Song[]>([]);
+  const [lofiSongs, setLofiSongs] = useState<Song[]>([]);
+
   const [extraSections, setExtraSections] = useState<{title: string, songs: Song[]}[]>([]);
   
   const [searchResults, setSearchResults] = useState<Song[]>([]);
@@ -44,8 +45,13 @@ export default function App() {
   const [searchPage, setSearchPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [homeCategoryIndex, setHomeCategoryIndex] = useState(0);
-  const [activeCategory, setActiveCategory] = useState<{title: string, query: string} | null>(null);
-  const extraCategories = ['Romantic', 'Workout', 'Chill', '90s Bollywood', 'Devotional', 'Pop', 'Indie', 'Punjabi', 'Lo-Fi'];
+  const [activeCategory, setActiveCategory] = useState<{title: string, query: string, type?: 'category' | 'artist' | 'god' | 'artist-grid' | 'god-grid'} | null>(null);
+  const extraCategories = ['Devotional Songs', 'Hindi', 'English', 'Punjabi', 'Haryanvi', 'Bhojpuri', 'Romantic', 'Workout', 'Chill', '90s Bollywood', 'Pop', 'Indie', 'Sad Songs', 'Party Anthems', 'Remixes'];
+
+  // PWA Install Prompt State
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIOS, setIsIOS] = useState(false);
 
   // Room State
   const [currentUserId] = useState(() => {
@@ -209,19 +215,13 @@ export default function App() {
     const loadInitial = async () => {
       setIsLoading(true);
       try {
-        const [trending, sad, party, remix, artist] = await Promise.all([
-          getTrendingSongs(),
-          getCategorySongs('sad songs'),
-          getCategorySongs('party songs'),
-          getCategorySongs('remix'),
-          getCategorySongs('Arijit Singh')
+        const [trending, lofi] = await Promise.all([
+          getTrendingSongs().catch(() => []),
+          getCategorySongs('Lo-Fi').catch(() => [])
         ]);
         
         setTrendingSongs(trending);
-        setSadSongs(sad);
-        setPartySongs(party);
-        setRemixSongs(remix);
-        setArtistSongs(artist);
+        setLofiSongs(lofi);
         
         setQueue(trending);
       } catch (error) {
@@ -242,6 +242,48 @@ export default function App() {
     
     loadInitial();
   }, []);
+
+  // Show PWA Banner Logic
+  useEffect(() => {
+    // Check if running in standalone (installed apps don't show the banner)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone || document.referrer.includes('android-app://');
+    if (isStandalone) return;
+
+    // Detect iOS/Mac
+    const currentIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+    setIsIOS(currentIOS);
+
+    // Show the banner exactly for 3 seconds every time the website is opened
+    setShowInstallBanner(true);
+    const timer = setTimeout(() => {
+      setShowInstallBanner(false);
+    }, 3000);
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+        }
+        setDeferredPrompt(null);
+        setShowInstallBanner(false);
+      });
+    }
+  };
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -287,25 +329,25 @@ export default function App() {
         }
       } else if (activeTab === 'category' && activeCategory) {
         const nextPage = searchPage + 1;
-        const fetchQuery = activeCategory.query === 'trending' ? 'top hits' : activeCategory.query;
-        const moreResults = await getCategorySongs(fetchQuery, nextPage);
         
-        if (moreResults.length > 0) {
-          setSearchResults(prev => {
-            const existingIds = new Set(prev.map(s => s.id));
-            const newUnique = moreResults.filter(s => !existingIds.has(s.id));
-            return [...prev, ...newUnique];
-          });
+        if (activeCategory.type === 'artist-grid' || activeCategory.type === 'god-grid') {
+          // Simply increment page to trigger multiplication of the array for infinite scroll illusion
           setSearchPage(nextPage);
-        }
-      } else if (activeTab === 'home') {
-        if (homeCategoryIndex < extraCategories.length) {
-          const category = extraCategories[homeCategoryIndex];
-          const songs = await getCategorySongs(category);
-          if (songs.length > 0) {
-            setExtraSections(prev => [...prev, { title: category, songs }]);
+          // Small simulated delay for smoothness
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } else {
+          const fetchQuery = activeCategory.query === 'trending' ? 'top hits' : activeCategory.query;
+          // If it's a category or podcast, fetch more pages from API
+          const moreResults = await getCategorySongs(fetchQuery, nextPage);
+          
+          if (moreResults.length > 0) {
+            setSearchResults(prev => {
+              const existingIds = new Set(prev.map(s => s.id));
+              const newUnique = moreResults.filter(s => !existingIds.has(s.id));
+              return [...prev, ...newUnique];
+            });
+            setSearchPage(nextPage);
           }
-          setHomeCategoryIndex(prev => prev + 1);
         }
       }
     } catch (error) {
@@ -382,6 +424,9 @@ export default function App() {
         setActiveTab('home');
         setActiveCategory(null);
         setQuery('');
+        setSearchResults([]);
+        setSearchPage(1);
+        window.scrollTo(0, 0);
       } else if (h === '#search') {
         setActiveTab('search');
       } else if (h === '#category') {
@@ -447,19 +492,55 @@ export default function App() {
     })();
   };
 
-  const handleSeeMore = (title: string, categoryQuery: string, initialSongs: Song[]) => {
-    if (window.location.hash !== '#category') {
-      window.location.hash = 'category';
-    }
+  const handleSeeMore = (title: string, categoryQuery: string, type: 'category' | 'artist' | 'podcast' | 'god' | 'artist-grid' | 'god-grid' = 'category', initialSongs: Song[] = []) => {
+    window.location.hash = 'category';
     setActiveTab('category');
-    setActiveCategory({ title, query: categoryQuery });
-    setSearchResults(initialSongs);
+    setActiveCategory({ title, query: categoryQuery, type });
     setSearchPage(1);
+    window.scrollTo(0, 0);
+    
+    if (initialSongs && initialSongs.length > 0) {
+      setSearchResults(initialSongs);
+    } else {
+      setSearchResults([]);
+      setIsLoadingMore(true);
+      getCategorySongs(categoryQuery, 1).then(results => {
+        setSearchResults(results);
+        setIsLoadingMore(false);
+      });
+    }
+  };
+
+  const handleArtistClick = (artistName: string) => {
+    handleSeeMore(artistName, artistName, 'artist', []);
+  };
+
+  const handleGodClick = (godName: string, query: string) => {
+    handleSeeMore(`${godName} Bhakti`, query, 'god', []);
+  };
+
+  const handleSeeAllArtists = () => {
+    window.location.hash = 'category';
+    setActiveTab('category');
+    setActiveCategory({ title: 'Top Artists', query: '', type: 'artist-grid' });
+    setSearchResults([]);
+    window.scrollTo(0, 0);
+  };
+
+  const handleSeeAllGods = () => {
+    window.location.hash = 'category';
+    setActiveTab('category');
+    setActiveCategory({ title: 'Devotional Spirits', query: '', type: 'god-grid' });
+    setSearchResults([]);
     window.scrollTo(0, 0);
   };
 
   const handleUIBack = () => {
-    window.history.back(); // This hands off cleanly to browser back logic
+    window.location.hash = 'home';
+    setActiveTab('home');
+    setActiveCategory(null);
+    setQuery('');
+    window.scrollTo(0, 0);
   };
 
   const addToRecentlyPlayed = (song: Song) => {
@@ -743,6 +824,30 @@ export default function App() {
         onPrevious={handlePrevious}
       />
 
+      <AnimatePresence>
+        {showInstallBanner && (
+           <motion.div
+             initial={{ opacity: 0, y: -20 }}
+             animate={{ opacity: 1, y: 0 }}
+             exit={{ opacity: 0, scale: 0.95 }}
+             className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-[60] w-[95%] max-w-lg cursor-pointer"
+             onClick={isIOS ? undefined : handleInstallClick}
+           >
+             <div className="flex items-center justify-center gap-2 sm:gap-4 px-4 py-3 bg-[#121212]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.5)] hover:bg-white/10 transition-colors">
+               {isIOS ? (
+                  <span className="text-sm font-medium text-white/90 text-center tracking-wide">
+                    Tap <span className="font-bold text-emerald-400">Share</span> and <span className="font-bold text-emerald-400">Add to Home Screen</span> to install
+                  </span>
+               ) : (
+                  <span className="text-sm font-bold text-emerald-400 tracking-wide text-center">
+                    Install this website click here
+                  </span>
+               )}
+             </div>
+           </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Content */}
       <main 
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-8 flex flex-col gap-4 relative z-10"
@@ -785,11 +890,17 @@ export default function App() {
             ) : (
               <p className="text-gray-400 text-center py-20">No results found. Try searching for something else.</p>
             )}
+            {isLoadingMore && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+              </div>
+            )}
+            <div ref={observerTarget} className="h-10 w-full" />
           </section>
         ) : activeTab === 'category' && activeCategory ? (
           // Category Full View
           <section>
-            <div className="flex items-center gap-4 mb-8">
+            <div className="flex items-center gap-4 mb-4">
               <button 
                 onClick={handleUIBack}
                 className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
@@ -798,21 +909,69 @@ export default function App() {
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <div className="flex items-center gap-2">
-                <ListMusic className="w-6 h-6 text-emerald-500" />
-                <h2 className="text-3xl font-bold tracking-tight">{activeCategory.title}</h2>
+                {activeCategory.type === 'artist' ? (
+                  <Mic2 className="w-6 h-6 text-emerald-500" />
+                ) : activeCategory.type === 'god' ? (
+                  <Sparkles className="w-6 h-6 text-orange-500" />
+                ) : (
+                  <ListMusic className="w-6 h-6 text-emerald-500" />
+                )}
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white/90">{activeCategory.title}</h2>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
-              {searchResults.map((song) => (
-                <SongCard 
-                  key={song.id} 
-                  song={song} 
-                  isPlaying={isPlaying}
-                  isCurrentSong={currentSong?.id === song.id}
-                  onPlay={(s) => handlePlay(s, searchResults)}
-                />
-              ))}
-            </div>
+
+            {activeCategory.type === 'artist-grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 mt-8">
+                {Array.from({ length: searchPage }).flatMap((_, pageIdx) => 
+                  POPULAR_ARTISTS.map((artist, i) => (
+                    <button 
+                      key={`${pageIdx}-${i}`} 
+                      className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all duration-300 flex items-center justify-center group"
+                      onClick={() => handleArtistClick(artist.name)}
+                    >
+                      <span className="text-sm font-semibold text-gray-200 group-hover:text-white transition-colors tracking-wide text-center">
+                        {artist.name}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : activeCategory.type === 'god-grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 mt-8">
+                {Array.from({ length: searchPage }).flatMap((_, pageIdx) => 
+                  DEVOTIONAL_GODS.map((god, i) => (
+                    <button 
+                      key={`${pageIdx}-${i}`} 
+                      className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-orange-500/50 hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all duration-300 flex items-center justify-center group"
+                      onClick={() => handleGodClick(god.name, god.query)}
+                    >
+                      <span className="text-sm font-semibold text-gray-200 group-hover:text-white transition-colors tracking-wide text-center">
+                        {god.name}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 ${activeCategory.type !== 'podcast' ? 'mt-8' : ''}`}>
+                {searchResults.map((song) => (
+                  <SongCard 
+                    key={song.id} 
+                    song={song} 
+                    isPlaying={isPlaying}
+                    isCurrentSong={currentSong?.id === song.id}
+                    onPlay={(s) => handlePlay(s, searchResults)}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {isLoadingMore && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+              </div>
+            )}
+            <div ref={observerTarget} className="h-10 w-full" />
           </section>
         ) : activeTab === 'games' ? (
           // Games View is now handled globally via Iframe
@@ -820,28 +979,26 @@ export default function App() {
         ) : (
           // Home View
           <div>
-            <SongSection title="Recently Played" icon={<Clock className="w-6 h-6 text-emerald-500" />} initialSongs={recentlyPlayed} query="recent" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
-            <SongSection title="Trending Now" icon={<Flame className="w-6 h-6 text-orange-500" />} initialSongs={trendingSongs} query="trending" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
-            <SongSection title="Sad Songs" icon={<HeartCrack className="w-6 h-6 text-blue-500" />} initialSongs={sadSongs} query="sad songs" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
-            <SongSection title="Party Anthems" icon={<PartyPopper className="w-6 h-6 text-purple-500" />} initialSongs={partySongs} query="party songs" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
-            <SongSection title="Remixes" icon={<Disc3 className="w-6 h-6 text-pink-500" />} initialSongs={remixSongs} query="remix" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
-            <SongSection title="Top Artist: Arijit Singh" icon={<Mic2 className="w-6 h-6 text-yellow-500" />} initialSongs={artistSongs} query="Arijit Singh" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+            <SongSection title="Recently Played" icon={<Clock className="w-6 h-6 text-emerald-500" />} initialSongs={recentlyPlayed} query="recent" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={(t, q) => handleSeeMore(t, q, 'category', recentlyPlayed)} />
             
-            {/* Dynamically loaded sections */}
-            {extraSections.map((section, idx) => (
+            <ArtistScroll onArtistClick={handleArtistClick} onSeeAll={handleSeeAllArtists} />
+            
+            <GodScroll onGodClick={handleGodClick} onSeeAll={handleSeeAllGods} />
+            
+            <SongSection title="Lo-Fi Vibes" icon={<Sparkles className="w-6 h-6 text-purple-400" />} initialSongs={lofiSongs} query="Lo-Fi" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={(t, q, s) => handleSeeMore(t, q, 'category', s)} />
+            
+            {/* Dynamically loaded sections handled natively by SongSection component */}
+            {extraCategories.map((title, idx) => (
               <React.Fragment key={idx}>
-                <SongSection title={section.title} icon={<ListMusic className="w-6 h-6 text-emerald-500" />} initialSongs={section.songs} query={section.title} isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+                <SongSection title={title} icon={<ListMusic className="w-6 h-6 text-emerald-500" />} initialSongs={[]} query={title} isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={(t, q, s) => handleSeeMore(t, q, 'category', s)} />
               </React.Fragment>
             ))}
+
+            {/* Trending Now moved to last */}
+            <SongSection title="Trending Now" icon={<Flame className="w-6 h-6 text-orange-500" />} initialSongs={trendingSongs} query="trending" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={(t, q, s) => handleSeeMore(t, q, 'category', s)} />
           </div>
         )}
 
-        {/* Infinite Scroll Observer Target */}
-        {!isLoading && (
-          <div ref={observerTarget} className="h-20 w-full flex items-center justify-center mt-8">
-            {isLoadingMore && <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />}
-          </div>
-        )}
       </main>
 
       {/* Games Global Layer */}
