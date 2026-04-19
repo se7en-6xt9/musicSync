@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Music, Loader2, Sparkles, Clock, Flame, HeartCrack, PartyPopper, Disc3, Mic2, ListMusic, X, ArrowLeft, Gamepad2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { io, Socket } from 'socket.io-client';
 import { Song, Room, RoomMember, ChatMessage } from './types';
 import { searchSongs, getTrendingSongs, getCategorySongs, getSimilarSongs } from './services/api';
@@ -46,11 +46,6 @@ export default function App() {
   const [homeCategoryIndex, setHomeCategoryIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<{title: string, query: string} | null>(null);
   const extraCategories = ['Romantic', 'Workout', 'Chill', '90s Bollywood', 'Devotional', 'Pop', 'Indie', 'Punjabi', 'Lo-Fi'];
-
-  // PWA Install Prompt State
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isIOS, setIsIOS] = useState(false);
 
   // Room State
   const [currentUserId] = useState(() => {
@@ -247,56 +242,6 @@ export default function App() {
     
     loadInitial();
   }, []);
-
-  // Show PWA Banner Logic
-  useEffect(() => {
-    // Check if running in standalone (installed)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone || document.referrer.includes('android-app://');
-    if (isStandalone) return;
-
-    // Detect iOS
-    const currentIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
-    setIsIOS(currentIOS);
-
-    const checkAndShowBanner = () => {
-      // Temporarily remove 24-hour limit for debugging
-      setShowInstallBanner(true);
-      // Hide after 5 seconds
-      setTimeout(() => {
-         setShowInstallBanner(false);
-      }, 5000);
-    };
-
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      checkAndShowBanner();
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // For iOS, there is no beforeinstallprompt, so we just run the check directly
-    if (currentIOS) {
-       checkAndShowBanner();
-    }
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  const handleInstallClick = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the install prompt');
-        }
-        setDeferredPrompt(null);
-        setShowInstallBanner(false);
-      });
-    }
-  };
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -798,30 +743,6 @@ export default function App() {
         onPrevious={handlePrevious}
       />
 
-      <AnimatePresence>
-        {showInstallBanner && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-6xl cursor-pointer"
-            onClick={isIOS ? undefined : handleInstallClick}
-          >
-            <div className="flex items-center justify-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 bg-black/40 backdrop-blur-xl border border-emerald-500/30 rounded-full shadow-[0_8px_32px_rgba(16,185,129,0.3)] hover:bg-black/60 transition-colors">
-              {isIOS ? (
-                 <span className="text-sm font-medium text-white/90 text-center">
-                   Tap <span className="font-bold text-emerald-400">Share</span> and <span className="font-bold text-emerald-400">Add to Home Screen</span> to install
-                 </span>
-              ) : (
-                 <span className="text-sm sm:text-base font-bold text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse text-center">
-                   Install this website click here
-                 </span>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Main Content */}
       <main 
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-8 flex flex-col gap-4 relative z-10"
@@ -900,6 +821,7 @@ export default function App() {
           // Home View
           <div>
             <SongSection title="Recently Played" icon={<Clock className="w-6 h-6 text-emerald-500" />} initialSongs={recentlyPlayed} query="recent" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
+            <SongSection title="Trending Now" icon={<Flame className="w-6 h-6 text-orange-500" />} initialSongs={trendingSongs} query="trending" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
             <SongSection title="Sad Songs" icon={<HeartCrack className="w-6 h-6 text-blue-500" />} initialSongs={sadSongs} query="sad songs" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
             <SongSection title="Party Anthems" icon={<PartyPopper className="w-6 h-6 text-purple-500" />} initialSongs={partySongs} query="party songs" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
             <SongSection title="Remixes" icon={<Disc3 className="w-6 h-6 text-pink-500" />} initialSongs={remixSongs} query="remix" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
@@ -911,9 +833,6 @@ export default function App() {
                 <SongSection title={section.title} icon={<ListMusic className="w-6 h-6 text-emerald-500" />} initialSongs={section.songs} query={section.title} isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
               </React.Fragment>
             ))}
-
-            {/* Trending Now moved to last */}
-            <SongSection title="Trending Now" icon={<Flame className="w-6 h-6 text-orange-500" />} initialSongs={trendingSongs} query="trending" isPlaying={isPlaying} currentSong={currentSong} onPlay={handlePlay} onSeeMore={handleSeeMore} />
           </div>
         )}
 
