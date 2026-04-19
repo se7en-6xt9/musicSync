@@ -259,17 +259,12 @@ export default function App() {
     setIsIOS(currentIOS);
 
     const checkAndShowBanner = () => {
-      const today = new Date().toDateString();
-      const lastShown = localStorage.getItem('installBannerLastShown');
-      
-      if (lastShown !== today) {
-         setShowInstallBanner(true);
-         localStorage.setItem('installBannerLastShown', today);
-         // Hide after 3 seconds
-         setTimeout(() => {
-           setShowInstallBanner(false);
-         }, 3000);
-      }
+      // Temporarily remove 24-hour limit for debugging
+      setShowInstallBanner(true);
+      // Hide after 5 seconds
+      setTimeout(() => {
+         setShowInstallBanner(false);
+      }, 5000);
     };
 
     const handleBeforeInstallPrompt = (e: any) => {
