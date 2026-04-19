@@ -143,28 +143,28 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         {/* Center: Search Bar or Mini Player (Game Mode) */}
-        <div className="flex-1 relative max-w-2xl">
+        <div className="flex-1 relative max-w-2xl min-w-0">
           {activeTab === 'games' ? (
-             <div className="flex w-full items-center gap-2 h-10 sm:h-[44px]">
+             <div className="flex w-full items-center gap-2 h-10 sm:h-[44px] min-w-0">
                <div 
-                 className="flex-1 flex items-center bg-white/10 rounded-full px-4 h-full cursor-pointer hover:bg-white/20 transition-colors shadow-inner"
+                 className="flex-1 flex items-center bg-white/10 rounded-full px-4 h-full cursor-pointer hover:bg-white/20 transition-colors shadow-inner min-w-0"
                  onClick={() => window.location.hash = 'player'}
                >
                  {currentSong ? (
                     <>
-                      <img src={getHighestQualityImage(currentSong.image) || undefined} className="w-6 h-6 sm:w-7 sm:h-7 rounded-full sm:rounded-md mr-3 object-cover shadow-sm" alt="" referrerPolicy="no-referrer" />
-                      <div className="flex flex-col flex-1 min-w-0 overflow-hidden text-left">
+                      <img src={getHighestQualityImage(currentSong.image) || undefined} className="w-6 h-6 sm:w-7 sm:h-7 rounded-full sm:rounded-md mr-3 object-cover shadow-sm shrink-0" alt="" referrerPolicy="no-referrer" />
+                      <div className="flex flex-col flex-1 min-w-0 overflow-hidden text-left pr-2">
                          <span className="text-sm font-semibold text-white truncate" dangerouslySetInnerHTML={{ __html: currentSong.name }}></span>
                          <span className="text-[10px] sm:text-xs text-gray-400 truncate" dangerouslySetInnerHTML={{ __html: currentSong.primaryArtists || 'Unknown Artist' }}></span>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3 ml-2" onClick={e => e.stopPropagation()}>
-                         <button onClick={onPrevious} className="text-gray-300 hover:text-white transition-colors hidden sm:block"><SkipBack size={16} className="fill-current" /></button>
-                         <button onClick={() => onPlayPause && onPlayPause(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-emerald-500 text-black rounded-full hover:scale-105 transition-transform"><span className={isPlaying ? "" : "ml-0.5"}>{isPlaying ? <Pause size={14} className="fill-current" /> : <Play size={14} className="fill-current" />}</span></button>
-                         <button onClick={onNext} className="text-gray-300 hover:text-white transition-colors"><SkipForward size={16} className="fill-current" /></button>
+                      <div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0" onClick={e => e.stopPropagation()}>
+                         <button onClick={onPrevious} className="text-gray-300 hover:text-white transition-colors hidden sm:block shrink-0"><SkipBack size={16} className="fill-current" /></button>
+                         <button onClick={() => onPlayPause && onPlayPause(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-emerald-500 text-black rounded-full hover:scale-105 transition-transform shrink-0"><span className={isPlaying ? "" : "ml-0.5"}>{isPlaying ? <Pause size={14} className="fill-current" /> : <Play size={14} className="fill-current" />}</span></button>
+                         <button onClick={onNext} className="text-gray-300 hover:text-white transition-colors shrink-0"><SkipForward size={16} className="fill-current" /></button>
                       </div>
                     </>
                  ) : (
-                    <span className="text-sm text-gray-400 flex items-center gap-2"><Music size={16} /> No song playing</span>
+                    <span className="text-sm text-gray-400 flex items-center gap-2 shrink-0"><Music size={16} className="shrink-0" /> No song playing</span>
                  )}
                </div>
              </div>
